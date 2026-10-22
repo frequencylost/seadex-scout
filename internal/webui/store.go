@@ -241,6 +241,10 @@ var findingMsgs = map[string]bool{
 	"SeaDex entry is incomplete":                          true,
 	"SeaDex lists a theoretical best only":                true,
 	"seadex finding":                                      true,
+	// This fork's Extended rows (compare.Config.Extended).
+	"SeaDex entry not downloaded":      true,
+	"library holds the SeaDex best":    true,
+	"SeaDex lists no best you can get": true,
 }
 
 // quietMsgs are high-volume lines the dashboard reads but leaves out of the

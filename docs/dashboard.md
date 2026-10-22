@@ -20,10 +20,21 @@ Its state goes in `webui-state.json` beside `config.yaml`, saved every minute an
   - Attention tiles, shown only while something needs a look. They use the same conditions as the Grafana tiles and Loki alerts.
   - The number of upgrades, findings to check by hand, the share of your anime at SeaDex's best or an alt, and when the last check ran.
   - The **Library overview** bars from the daily full check.
-  - **Upgrades available**, with filters and sortable columns. SeaDex's best release and its headline alt each get a **Size / change** column and a **Link** column, Nyaa first. The size is the download, and the change below it is how much your library grows or shrinks if you take it. Any other alt groups SeaDex lists appear under the alt's name. **Show optional upgrades** adds the upgrades where you already have a SeaDex alt.
+  - A filter bar for both tables: title or group, Sonarr or Radarr, what to show, and **Show optional upgrades**, which adds the upgrades where you already have a SeaDex alt.
+  - **Upgrades available** lists everything with something to do. The **Why** column says what:
+    - Upgrades come first: **Newer version** of your group, **Neither best nor alt**, and optionally **SeaDex alt**.
+    - Then **Not downloaded**: seasons and films Sonarr or Radarr has, with no file yet, that SeaDex has an entry for.
+    - Then the release groups that need a look: **Several release groups** and **Group could not be read**.
+    - Then **No SeaDex best**: entries where SeaDex names only a theoretical best, the entry is incomplete, or the best is filtered out or on a tracker you have turned off. The SeaDex best column says which, and the alt still shows.
+  - **Already on a SeaDex pick** lists what you hold at SeaDex's best, or at an alt where SeaDex names no best. A negative alt size change there is disk space the alt would save.
 
-    The alt's size and link come from attributes this fork adds to the `better release available` line: `alt_group`, `alt_nyaa_url`, `alt_public_url`, `alt_ab_url`, `alt_recommended_bytes` and `alt_size_change_bytes`. They are worked out the same way as the best release's and stay out of the log contract the alert rules read.
-  - **Check by hand**, plus the informational findings.
+  Both tables have the same columns:
+  - **On disk:** the size of the files Sonarr or Radarr holds.
+  - SeaDex's best and its headline alt each get a **Size / change** column and a **Link** column, Nyaa first. The size is the download, and the change below it is how much your library grows or shrinks if you take it.
+  - Both group names link to the show's SeaDex page. Any other alt groups SeaDex lists appear under the alt's name.
+  - An incomplete SeaDex entry with a best still lists as an upgrade, marked "SeaDex entry incomplete".
+
+  To list all of this, this fork's comparison runs in an extended mode (`compare.Config.Extended`). It also reports entries upstream stays silent on: no file, already at best, and no obtainable best. It adds attributes to every finding line: `library_bytes`, `entry_incomplete`, `no_best_reason`, the `alt_*` ones, and the sizes. The new rows log at `info` as `SeaDex entry not downloaded`, `library holds the SeaDex best` and `SeaDex lists no best you can get`. None of this is in the log contract upstream's alert rules read, apart from one change: an incomplete entry with a best now logs `better release available` rather than `SeaDex entry is incomplete`. The log grows by one line per SeaDex entry in your library on each check.
 - **Activity**: upgrades entering and leaving the list.
 - **Scout health**:
   - Lasting problems such as a SeaDex outage.

@@ -11,7 +11,7 @@ const DAY = 24 * HOUR;
 const state = {
   snap: null,
   tab: "overview",
-  upgradesSort: { key: "rank", asc: true },
+  sorts: { upgrades: null, atbest: null },
   report: null,
   reportVerdict: "",
 };
@@ -53,6 +53,7 @@ function link(href, text, cls) {
 }
 
 function num(v) {
+  if (v === null || v === undefined || v === "") return null;
   const n = typeof v === "number" ? v : Number(v);
   return Number.isFinite(n) ? n : null;
 }
@@ -190,23 +191,6 @@ async function refresh() {
   }
 }
 
-function findings(snap, msg) {
-  return (snap.findings || []).filter((f) => f.msg === msg);
-}
-
-function upgrades(snap) {
-  return findings(snap, "better release available");
-}
-
-function checks(snap) {
-  return (snap.findings || []).filter((f) => f.msg.endsWith("manual review"));
-}
-
-function infos(snap) {
-  return (snap.findings || []).filter((f) =>
-    f.msg !== "better release available" && !f.msg.endsWith("manual review"));
-}
-
 // ---------- attention ----------
 
 function attentionItems(snap) {
@@ -323,25 +307,54 @@ function render() {
 
 // ---------- render: overview ----------
 
+// The row kinds of the two finding tables, by status.
+const UPGRADE = new Set(["better_release", "newer_revision"]);
+const GROUPS = new Set(["mixed_group_manual", "unverifiable"]);
+const NO_BEST = new Set(["theoretical_best", "incomplete", "no_best"]);
+
+// kindOf sorts a finding into the Why filter's kinds; "atbest" rows go to the
+// Already on a SeaDex pick table instead of Upgrades available.
+function kindOf(f) {
+  const a = f.attrs;
+  if (a.status === "at_best") return "atbest";
+  if (NO_BEST.has(a.status)) return a.current_tier === "alt" ? "atbest" : "nobest";
+  if (UPGRADE.has(a.status)) return "upgrade";
+  if (GROUPS.has(a.status)) return "groups";
+  if (a.status === "not_downloaded") return "missing";
+  return "other";
+}
+
+const KIND_ORDER = { upgrade: 0, missing: 1, groups: 2, nobest: 3, atbest: 4, other: 5 };
+
 function whyOf(a) {
-  if (a.status === "newer_revision") return { text: "Newer version", cls: "info" };
-  if (a.current_tier === "alt") return { text: "SeaDex alt", cls: "good" };
-  return { text: "Neither best nor alt", cls: "warn" };
+  switch (a.status) {
+    case "newer_revision": return { text: "Newer version", cls: "info" };
+    case "better_release": return a.current_tier === "alt"
+      ? { text: "SeaDex alt", cls: "good" } : { text: "Neither best nor alt", cls: "warn" };
+    case "mixed_group_manual": return { text: "Several release groups", cls: "" };
+    case "unverifiable": return { text: "Group could not be read", cls: "" };
+    case "not_downloaded": return { text: "Not downloaded", cls: "bad" };
+    case "at_best": return { text: "At SeaDex best", cls: "good" };
+    default: return a.current_tier === "alt"
+      ? { text: "At a SeaDex alt", cls: "good" } : { text: "No SeaDex best", cls: "" };
+  }
 }
 
 function renderOverview(snap) {
   const now = new Date(snap.now).getTime();
+  const ready = Boolean(snap.pass && snap.pass.id);
   const showOptional = $("upgrades-optional").checked;
-  const all = upgrades(snap);
-  const visible = all.filter((f) => showOptional || f.attrs.current_tier !== "alt");
+  const rows = (snap.findings || []).filter((f) => kindOf(f) !== "other");
+  const isOptional = (f) => f.attrs.status === "better_release" && f.attrs.current_tier === "alt";
+  const todo = rows.filter((f) => kindOf(f) !== "atbest" && (showOptional || !isOptional(f)));
+  const atBest = rows.filter((f) => kindOf(f) === "atbest");
 
-  $("kpi-upgrades").textContent = snap.pass && snap.pass.id ? visible.length : "–";
-  const optional = all.length - all.filter((f) => f.attrs.current_tier !== "alt").length;
-  $("kpi-upgrades-sub").textContent = optional ? `${optional} more optional (you have an alt)` : "better releases and newer versions";
-  $("kpi-upgrades").parentElement.className = "kpi" + (visible.length ? " warn" : snap.pass && snap.pass.id ? " good" : "");
-
-  const chk = checks(snap);
-  $("kpi-checks").textContent = snap.pass && snap.pass.id ? chk.length : "–";
+  const upgradesShown = todo.filter((f) => kindOf(f) === "upgrade").length;
+  const optional = rows.filter(isOptional).length;
+  $("kpi-upgrades").textContent = ready ? upgradesShown : "–";
+  $("kpi-upgrades-sub").textContent = optional && !showOptional ? `${optional} more optional (you have an alt)` : "better releases and newer versions";
+  $("kpi-upgrades").parentElement.className = "kpi" + (upgradesShown ? " warn" : ready ? " good" : "");
+  $("kpi-missing").textContent = ready ? rows.filter((f) => kindOf(f) === "missing").length : "–";
 
   const lib = snap.library && snap.library.attrs;
   if (lib && num(lib.anime_items)) {
@@ -361,9 +374,10 @@ function renderOverview(snap) {
   $("kpi-lastcheck").parentElement.className = "kpi" + (lc && lc.msg.includes("degraded") ? " warn" : "");
 
   renderLibrary(snap, now);
-  renderUpgrades(visible, now);
-  renderChecks(chk, now);
-  renderInfos(infos(snap));
+  const why = $("upgrades-why").value;
+  renderFindings("upgrades", todo.filter((f) => !why || kindOf(f) === why), now,
+    ready ? "Nothing to do. Your library is on SeaDex's picks." : "Waiting for the first check.");
+  renderFindings("atbest", atBest, now, ready ? "None yet." : "Waiting for the first check.");
 }
 
 const LIBRARY_BARS = [
@@ -402,63 +416,132 @@ function renderLibrary(snap, now) {
     }));
 }
 
-function upgradeSortValue(f, key, showOptional) {
+// FINDING_COLUMNS is the column layout both finding tables share. key names
+// the sort, when the column sorts.
+const FINDING_COLUMNS = [
+  { label: "Title", key: "title" },
+  { label: "On disk", key: "disk", num: true, title: "The size of the files Sonarr or Radarr holds for this season or film" },
+  { label: "Why", key: "why" },
+  { label: "You have", key: "current" },
+  { label: "SeaDex best", key: "best" },
+  { label: "Size / change", key: "change", num: true, title: "Download size, and below it how much your library grows (+) or shrinks (−)" },
+  { label: "Link" },
+  { label: "SeaDex alt", key: "alt" },
+  { label: "Size / change", key: "altchange", num: true, title: "Download size, and below it how much your library grows (+) or shrinks (−)" },
+  { label: "Link" },
+  { label: "First seen", key: "first", num: true },
+];
+
+const TEXT_SORTS = new Set(["title", "why", "current", "best", "alt"]);
+
+function sortValue(f, key, showOptional) {
   const a = f.attrs;
   switch (key) {
     case "title": return (a.title || "").toLowerCase();
     case "why": return whyOf(a).text;
-    case "current": return (a.current_group || "").toLowerCase();
-    case "best": return (a.recommended_group || "").toLowerCase();
-    case "change": return num(a.size_change_bytes) ?? -Infinity;
+    case "current": return (a.current_group || "~").toLowerCase();
+    case "best": return (a.recommended_group || "~").toLowerCase();
+    case "disk": return num(a.library_bytes) ?? -Infinity;
+    case "change": return changeOf(a, "") ?? -Infinity;
     case "alt": return (a.alt_group || a.alt_groups || "~").toLowerCase();
-    case "altchange": return num(a.alt_size_change_bytes) ?? -Infinity;
+    case "altchange": return changeOf(a, "alt_") ?? -Infinity;
     case "first": return num(a.first_seen) ?? 0;
-    default: {
-      const r = num(showOptional ? a.rank_none : a.rank_alt);
-      return r && r > 0 ? r : Infinity;
-    }
+    default: return null;
   }
 }
 
-function renderUpgrades(list, now) {
+// defaultOrder is the tables' own order: by kind, upgrades by their rank in
+// the view shown, then by title.
+function defaultOrder(x, y, showOptional) {
+  const kx = KIND_ORDER[kindOf(x)], ky = KIND_ORDER[kindOf(y)];
+  if (kx !== ky) return kx - ky;
+  const rank = (f) => {
+    const r = num(showOptional ? f.attrs.rank_none : f.attrs.rank_alt);
+    return r && r > 0 ? r : Infinity;
+  };
+  const rx = rank(x), ry = rank(y);
+  if (rx !== ry) return rx < ry ? -1 : 1;
+  return (x.attrs.title || "").localeCompare(y.attrs.title || "");
+}
+
+// changeOf is a release's size change. A season with nothing on disk grows
+// by the whole download.
+function changeOf(a, prefix) {
+  const change = num(a[prefix + "size_change_bytes"]);
+  if (change !== null) return change;
+  return a.status === "not_downloaded" ? num(a[prefix + "recommended_bytes"]) : null;
+}
+
+function renderFindings(table, list, now, emptyText) {
   const q = $("upgrades-search").value.trim().toLowerCase();
   const arr = $("upgrades-arr").value;
   const showOptional = $("upgrades-optional").checked;
-  const { key, asc } = state.upgradesSort;
+  const sort = state.sorts[table];
   const rows = list
     .filter((f) => !arr || f.attrs.arr === arr)
-    .filter((f) => !q || [f.attrs.title, f.attrs.current_group, f.attrs.recommended_group, f.attrs.alt_groups]
+    .filter((f) => !q || [f.attrs.title, f.attrs.current_group, f.attrs.recommended_group, f.attrs.alt_group, f.attrs.alt_groups]
       .some((s) => typeof s === "string" && s.toLowerCase().includes(q)))
     .sort((x, y) => {
-      const a = upgradeSortValue(x, key, showOptional), b = upgradeSortValue(y, key, showOptional);
+      if (!sort) return defaultOrder(x, y, showOptional);
+      const a = sortValue(x, sort.key, showOptional), b = sortValue(y, sort.key, showOptional);
       const c = a < b ? -1 : a > b ? 1 : 0;
-      return asc ? c : -c;
+      return (sort.asc ? c : -c) || defaultOrder(x, y, showOptional);
     });
 
-  $("upgrades-count").textContent = rows.length;
-  for (const th of document.querySelectorAll("#upgrades th[data-sort]")) {
-    th.classList.toggle("sorted", th.dataset.sort === key);
-    th.classList.toggle("asc", th.dataset.sort === key && asc);
-  }
+  $(table + "-count").textContent = rows.length;
+  const tbl = $(table);
+  tbl.tHead.replaceChildren(el("tr", {}, FINDING_COLUMNS.map((col) => {
+    const sorted = sort && col.key && sort.key === col.key;
+    const th = el("th", { class: [col.num ? "num" : "", sorted ? "sorted" : "", sorted && sort.asc ? "asc" : ""].join(" ").trim() || null, title: col.title, "data-sort": col.key }, col.label);
+    if (col.key) th.addEventListener("click", () => {
+      const s = state.sorts[table];
+      state.sorts[table] = s && s.key === col.key ? { key: col.key, asc: !s.asc } : { key: col.key, asc: TEXT_SORTS.has(col.key) };
+      renderOverview(state.snap);
+    });
+    return th;
+  })));
+  setRows(tbl.tBodies[0], rows.map((f) => findingRow(f, now)), FINDING_COLUMNS.length, emptyText);
+}
 
-  setRows($("upgrades").tBodies[0], rows.map((f) => {
-    const a = f.attrs;
-    const why = whyOf(a);
-    const tags = a.seadex_tags ? el("span", { class: "sub", text: a.seadex_tags }) : null;
-    const bestLinks = releaseLinks(a, "");
-    if (!bestLinks.length && a.release_url) bestLinks.push(link(a.release_url, a.tracker || "Release"));
-    return el("tr", {},
-      el("td", {}, link(a.arr_url, a.title || "?"), el("span", { class: "sub", text: `${arrName(a.arr)} · ${seasonLabel(a)}` })),
-      el("td", {}, el("span", { class: "tag " + why.cls, text: why.text })),
-      el("td", { text: groupWithRevision(a.current_group, a.status === "newer_revision" ? a.current_revision : "") }),
-      el("td", {}, link(a.al_id ? SEADEX + a.al_id + "/" : "", groupWithRevision(a.recommended_group, a.status === "newer_revision" ? a.recommended_revision : "")), tags),
-      sizeCell(a.recommended_bytes, a.size_change_bytes),
-      el("td", {}, el("div", { class: "links" }, bestLinks)),
-      altCell(a),
-      a.alt_group ? sizeCell(a.alt_recommended_bytes, a.alt_size_change_bytes) : el("td", { class: "num", text: "–" }),
-      el("td", {}, el("div", { class: "links" }, releaseLinks(a, "alt_"))),
-      el("td", { class: "num", text: a.first_seen ? ago(num(a.first_seen), now) : "–" }));
-  }), 10, state.snap.pass && state.snap.pass.id ? "No upgrades. Your library is on SeaDex's picks." : "Waiting for the first check.");
+function findingRow(f, now) {
+  const a = f.attrs;
+  const why = whyOf(a);
+  const newer = a.status === "newer_revision";
+  const entry = a.al_id ? SEADEX + a.al_id + "/" : "";
+  const bestLinks = releaseLinks(a, "");
+  if (!bestLinks.length && a.release_url) bestLinks.push(link(a.release_url, a.tracker || "Release"));
+  const notes = [a.seadex_tags, a.entry_incomplete ? "SeaDex entry incomplete" : ""].filter(Boolean).join(" · ");
+  const best = a.recommended_group
+    ? el("td", {}, link(entry, groupWithRevision(a.recommended_group, newer ? a.recommended_revision : "")), notes ? el("span", { class: "sub", text: notes }) : null)
+    : el("td", {}, link(entry, noBestText(a)), el("span", { class: "sub", text: noBestDetail(a) }));
+  return el("tr", {},
+    el("td", {}, link(a.arr_url, a.title || "?"), el("span", { class: "sub", text: `${arrName(a.arr)} · ${seasonLabel(a)}` })),
+    el("td", { class: "num", text: a.status === "not_downloaded" ? "–" : fmtBytes(a.library_bytes) }),
+    el("td", {}, el("span", { class: "tag " + why.cls, text: why.text })),
+    el("td", { text: a.status === "not_downloaded" ? "–" : groupWithRevision(a.current_group, newer ? a.current_revision : "") }),
+    best,
+    a.recommended_group ? sizeCell(a.recommended_bytes, changeOf(a, "")) : el("td", { class: "num", text: "–" }),
+    el("td", {}, el("div", { class: "links" }, bestLinks)),
+    altCell(a, entry),
+    a.alt_group ? sizeCell(a.alt_recommended_bytes, changeOf(a, "alt_")) : el("td", { class: "num", text: "–" }),
+    el("td", {}, el("div", { class: "links" }, releaseLinks(a, "alt_"))),
+    el("td", { class: "num", text: a.first_seen ? ago(num(a.first_seen), now) : "–" }));
+}
+
+function noBestText(a) {
+  switch (a.no_best_reason || a.status) {
+    case "theoretical": case "theoretical_best": return "No best yet";
+    case "incomplete": return "No best yet";
+    default: return "No best you can get";
+  }
+}
+
+function noBestDetail(a) {
+  switch (a.no_best_reason || a.status) {
+    case "theoretical": case "theoretical_best": return "SeaDex names a theoretical best only";
+    case "incomplete": return "SeaDex entry incomplete";
+    default: return "its best is filtered out or on a tracker you have off";
+  }
 }
 
 // sizeCell shows a download size with the size change it brings underneath.
@@ -479,39 +562,13 @@ function releaseLinks(a, prefix) {
   return links;
 }
 
-// altCell names the alt release shown beside it, with any other alt groups
-// SeaDex lists underneath.
-function altCell(a) {
+// altCell names the alt release shown beside it, linked to the SeaDex entry
+// like the best, with any other alt groups SeaDex lists underneath.
+function altCell(a, entry) {
   const all = typeof a.alt_groups === "string" && a.alt_groups ? a.alt_groups.split(",") : [];
   if (!a.alt_group) return el("td", { text: all.join(", ") || "–" });
   const others = all.filter((g) => g.toLowerCase() !== a.alt_group.toLowerCase());
-  return el("td", {}, a.alt_group, others.length ? el("span", { class: "sub", text: "also " + others.join(", ") }) : null);
-}
-
-function renderChecks(list, now) {
-  $("checks-count").textContent = list.length;
-  setRows($("checks").tBodies[0], list.map((f) => {
-    const a = f.attrs;
-    return el("tr", {},
-      el("td", {}, link(a.arr_url, a.title || "?"), el("span", { class: "sub", text: `${arrName(a.arr)} · ${seasonLabel(a)}` })),
-      el("td", { text: a.status === "mixed_group_manual" ? "Several release groups" : "Group could not be read" }),
-      el("td", { text: a.current_group || "–" }),
-      el("td", {}, link(a.al_id ? SEADEX + a.al_id + "/" : "", a.recommended_group || "–")),
-      el("td", { text: a.alt_groups || "–" }),
-      el("td", { class: "num", text: a.first_seen ? ago(num(a.first_seen), now) : "–" }));
-  }), 6, "Nothing to check by hand.");
-}
-
-function renderInfos(list) {
-  $("info-count").textContent = list.length;
-  setRows($("infos").tBodies[0], list.map((f) => {
-    const a = f.attrs;
-    return el("tr", {},
-      el("td", {}, link(a.arr_url, a.title || "?"), el("span", { class: "sub", text: `${arrName(a.arr)} · ${seasonLabel(a)}` })),
-      el("td", { text: f.msg }),
-      el("td", { text: a.current_group || "–" }),
-      el("td", {}, link(a.al_id ? SEADEX + a.al_id + "/" : "", a.recommended_group || "–")));
-  }), 4, "None.");
+  return el("td", {}, link(entry, a.alt_group), others.length ? el("span", { class: "sub", text: "also " + others.join(", ") }) : null);
 }
 
 // ---------- render: activity ----------
@@ -780,16 +837,8 @@ async function loadLogs() {
 function init() {
   initTheme();
   initTabs();
-  for (const id of ["upgrades-search", "upgrades-arr", "upgrades-optional"]) {
+  for (const id of ["upgrades-search", "upgrades-arr", "upgrades-why", "upgrades-optional"]) {
     $(id).addEventListener("input", () => state.snap && renderOverview(state.snap));
-  }
-  for (const th of document.querySelectorAll("#upgrades th[data-sort]")) {
-    th.addEventListener("click", () => {
-      const key = th.dataset.sort;
-      const s = state.upgradesSort;
-      state.upgradesSort = s.key === key ? { key, asc: !s.asc } : { key, asc: ["title", "current", "best", "why", "alt"].includes(key) };
-      if (state.snap) renderOverview(state.snap);
-    });
   }
   $("report-run").addEventListener("click", runReport);
   $("report-search").addEventListener("input", renderReport);

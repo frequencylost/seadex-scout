@@ -68,7 +68,7 @@ func TestDemo(t *testing.T) {
 			kvs[len(kvs)-3] = 0 // rank_alt: hidden when optional upgrades are hidden
 		}
 		if s.size > 0 {
-			kvs = append(kvs, "recommended_bytes", s.size, "size_change_bytes", s.change)
+			kvs = append(kvs, "recommended_bytes", s.size, "size_change_bytes", s.change, "library_bytes", s.size-s.change)
 		}
 		if i%3 != 2 {
 			kvs = append(kvs, "alt_group", "Vodes", "alt_nyaa_url", fmt.Sprintf("https://nyaa.si/view/%d", 1800000+i),
@@ -83,9 +83,27 @@ func TestDemo(t *testing.T) {
 	}
 	log.Info("series spans multiple release groups, manual review", "title", "Cowboy Bebop", "al_id", 1,
 		"arr", "sonarr", "season", 1, "status", "mixed_group_manual", "current_group", "Judas, YURI",
-		"recommended_group", "MTBB", "alt_groups", "", "pass_id", pass, "first_seen", pass, "rank_check", 1)
-	log.Info("SeaDex entry is incomplete", "title", "One Piece", "al_id", 21, "arr", "sonarr",
-		"season", 1, "status", "incomplete", "pass_id", pass)
+		"recommended_group", "MTBB", "nyaa_url", "https://nyaa.si/view/47", "recommended_bytes", int64(60<<30),
+		"size_change_bytes", int64(25<<30), "library_bytes", int64(35<<30), "alt_groups", "", "pass_id", pass,
+		"first_seen", pass, "rank_check", 1)
+	log.Info("SeaDex lists a theoretical best only", "title", "One Piece", "al_id", 21, "arr", "sonarr",
+		"season", 1, "status", "theoretical_best", "no_best_reason", "theoretical", "current_group", "Erai-raws",
+		"alt_group", "Judas", "alt_groups", "judas", "alt_nyaa_url", "https://nyaa.si/view/42",
+		"alt_recommended_bytes", int64(90<<30), "alt_size_change_bytes", int64(20<<30), "library_bytes", int64(70<<30), "pass_id", pass)
+	log.Info("SeaDex entry not downloaded", "title", "Dandadan", "al_id", 171018, "arr", "sonarr",
+		"season", 2, "status", "not_downloaded", "recommended_group", "Kawaiika-Raws", "nyaa_url", "https://nyaa.si/view/43",
+		"recommended_bytes", int64(16<<30), "alt_group", "Vodes", "alt_groups", "vodes", "alt_nyaa_url", "https://nyaa.si/view/44",
+		"alt_recommended_bytes", int64(5<<30), "pass_id", pass, "first_seen", pass)
+	log.Info("SeaDex entry not downloaded", "title", "Perfect Blue", "al_id", 437, "arr", "radarr",
+		"status", "not_downloaded", "no_best_reason", "unobtainable", "alt_groups", "", "pass_id", pass, "first_seen", pass)
+	log.Info("library holds the SeaDex best", "title", "Kaguya-sama: Love Is War", "al_id", 101921, "arr", "sonarr",
+		"season", 1, "status", "at_best", "current_group", "Okay-Subs", "recommended_group", "Okay-Subs",
+		"nyaa_url", "https://nyaa.si/view/45", "recommended_bytes", int64(22<<30), "size_change_bytes", int64(0),
+		"library_bytes", int64(22<<30), "alt_group", "smol", "alt_groups", "smol", "alt_nyaa_url", "https://nyaa.si/view/46",
+		"alt_recommended_bytes", int64(6<<30), "alt_size_change_bytes", -int64(16<<30), "pass_id", pass, "first_seen", pass)
+	log.Info("SeaDex lists no best you can get", "title", "Akira", "al_id", 47, "arr", "radarr",
+		"status", "no_best", "no_best_reason", "unobtainable", "current_group", "Arid", "current_tier", "alt",
+		"alt_group", "Arid", "alt_groups", "arid", "library_bytes", int64(40<<30), "pass_id", pass, "first_seen", pass)
 	log.Info("upgrade found", "pass_id", pass, "after_start", false, "title", "Frieren: Beyond Journey's End",
 		"al_id", 1000, "arr", "sonarr", "season", 1, "current_group", "SubsPlease", "recommended_group", "Okay-Subs")
 	log.Info("upgrade resolved", "pass_id", pass, "after_start", false, "title", "Made in Abyss",

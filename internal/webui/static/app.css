@@ -295,6 +295,8 @@ td.empty, p.empty { color: var(--muted); text-align: center; padding: 18px; }
 .chart .bar { fill: var(--accent); }
 .chart .bar.degraded { fill: var(--warn); }
 
+.filters { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; padding: 12px 18px; }
+
 .kv { display: grid; grid-template-columns: max-content 1fr; gap: 6px 16px; margin: 0; font-size: 13px; }
 .kv dt { color: var(--muted); }
 .kv dd { margin: 0; overflow-wrap: anywhere; }

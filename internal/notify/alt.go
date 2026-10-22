@@ -30,6 +30,26 @@ func altKVs(f *compare.Finding) []any {
 	return kvs
 }
 
+// forkKVs is what this fork adds to every finding line for the dashboard:
+// the sizes on a row upstream does not size, the size on disk, the entry's
+// incomplete flag, why no best is named, and the headline alt.
+func forkKVs(f *compare.Finding) []any {
+	var kvs []any
+	if !isUpgrade(f) {
+		kvs = append(kvs, sizeKVs(f)...)
+	}
+	if f.LibraryBytes > 0 {
+		kvs = append(kvs, "library_bytes", f.LibraryBytes)
+	}
+	if f.EntryIncomplete {
+		kvs = append(kvs, "entry_incomplete", true)
+	}
+	if f.NoBestReason != "" {
+		kvs = append(kvs, "no_best_reason", f.NoBestReason)
+	}
+	return append(kvs, altKVs(f)...)
+}
+
 // boundRetainedAlt is boundRetained for the alt release's untrusted strings.
 func boundRetainedAlt(f *compare.Finding) {
 	f.Alt.Group = capAttr(f.Alt.Group)

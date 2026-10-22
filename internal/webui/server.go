@@ -46,7 +46,13 @@ func NewServer(o Options) *http.Server {
 	})
 
 	app := http.NewServeMux()
-	app.Handle("GET /", http.FileServerFS(static))
+	files := http.FileServerFS(static)
+	app.HandleFunc("GET /", func(w http.ResponseWriter, r *http.Request) {
+		// The embedded files carry no modification time, so without this a
+		// browser can keep serving the page from before an image update.
+		w.Header().Set("Cache-Control", "no-cache")
+		files.ServeHTTP(w, r)
+	})
 	app.HandleFunc("GET /api/state", func(w http.ResponseWriter, _ *http.Request) {
 		writeJSON(w, o.Store.Snapshot())
 	})

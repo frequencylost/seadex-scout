@@ -38,7 +38,7 @@
 
     <div class="kpis">
       <div class="kpi"><span class="kpi-label">Upgrades</span><span id="kpi-upgrades" class="kpi-value">–</span><span id="kpi-upgrades-sub" class="kpi-sub"></span></div>
-      <div class="kpi"><span class="kpi-label">To check by hand</span><span id="kpi-checks" class="kpi-value">–</span><span class="kpi-sub">mixed or untagged groups</span></div>
+      <div class="kpi"><span class="kpi-label">Not downloaded</span><span id="kpi-missing" class="kpi-value">–</span><span class="kpi-sub">SeaDex entries with no file yet</span></div>
       <div class="kpi"><span class="kpi-label">Anime at SeaDex best or alt</span><span id="kpi-bestalt" class="kpi-value">–</span><span id="kpi-bestalt-sub" class="kpi-sub"></span></div>
       <div class="kpi"><span class="kpi-label">Last check</span><span id="kpi-lastcheck" class="kpi-value">–</span><span id="kpi-lastcheck-sub" class="kpi-sub"></span></div>
     </div>
@@ -51,47 +51,40 @@
       <div id="library" class="bars"><p class="empty">Shown after the first daily full check.</p></div>
     </div>
 
+    <div class="card filters">
+      <input id="upgrades-search" type="search" placeholder="Filter by title or group" aria-label="Filter by title or group">
+      <select id="upgrades-arr" aria-label="App"><option value="">Sonarr and Radarr</option><option value="sonarr">Sonarr</option><option value="radarr">Radarr</option></select>
+      <select id="upgrades-why" aria-label="Why">
+        <option value="">Everything to do</option>
+        <option value="upgrade">Upgrades</option>
+        <option value="missing">Not downloaded</option>
+        <option value="groups">Groups to check</option>
+        <option value="nobest">No SeaDex best</option>
+      </select>
+      <label class="toggle"><input id="upgrades-optional" type="checkbox"> Show optional upgrades</label>
+    </div>
+
     <div class="card">
-      <div class="card-head">
-        <h2>Upgrades available <span id="upgrades-count" class="count"></span></h2>
-        <div class="controls">
-          <input id="upgrades-search" type="search" placeholder="Filter by title or group" aria-label="Filter upgrades">
-          <select id="upgrades-arr" aria-label="App"><option value="">Sonarr and Radarr</option><option value="sonarr">Sonarr</option><option value="radarr">Radarr</option></select>
-          <label class="toggle"><input id="upgrades-optional" type="checkbox"> Show optional upgrades</label>
-        </div>
-      </div>
-      <p class="muted small">Optional upgrades are ones where you already have a SeaDex alt. Newer versions of your group come first, then by size change. Each size shows the download, and below it how much your library grows (+) or shrinks (−).</p>
+      <div class="card-head"><h2>Upgrades available <span id="upgrades-count" class="count"></span></h2></div>
+      <p class="muted small">Upgrades come first, newer versions of your group leading, then entries not downloaded, then ones whose release group needs a look, then entries SeaDex names no best for. Optional upgrades are ones where you already have a SeaDex alt. Each size shows the download, and below it how much your library grows (+) or shrinks (−).</p>
       <div class="table-wrap">
-        <table id="upgrades" class="data">
-          <thead><tr>
-            <th data-sort="title">Title</th><th data-sort="why">Why</th><th data-sort="current">You have</th><th data-sort="best">SeaDex best</th><th data-sort="change" class="num" title="Download size, and below it how much your library grows (+) or shrinks (−)">Size / change</th><th>Link</th><th data-sort="alt">SeaDex alt</th><th data-sort="altchange" class="num" title="Download size, and below it how much your library grows (+) or shrinks (−)">Size / change</th><th>Link</th><th data-sort="first" class="num">First seen</th>
-          </tr></thead>
+        <table id="upgrades" class="data findings">
+          <thead></thead>
           <tbody></tbody>
         </table>
       </div>
     </div>
 
     <div class="card">
-      <div class="card-head"><h2>Check by hand <span id="checks-count" class="count"></span></h2></div>
-      <p class="muted small">Seasons whose files span several release groups, or whose group could not be read, so the scout cannot say which release you have.</p>
+      <div class="card-head"><h2>Already on a SeaDex pick <span id="atbest-count" class="count"></span></h2></div>
+      <p class="muted small">Seasons and films you hold at SeaDex's best, or at an alt where SeaDex names no best. A negative alt size change is disk space an alt would save.</p>
       <div class="table-wrap">
-        <table id="checks" class="data">
-          <thead><tr><th>Title</th><th>Reason</th><th>You have</th><th>SeaDex best</th><th>SeaDex alt</th><th class="num">First seen</th></tr></thead>
+        <table id="atbest" class="data findings">
+          <thead></thead>
           <tbody></tbody>
         </table>
       </div>
     </div>
-
-    <details class="card">
-      <summary><h2>Informational <span id="info-count" class="count"></span></h2></summary>
-      <p class="muted small">SeaDex entries that are incomplete or list a theoretical best only. Nothing to do.</p>
-      <div class="table-wrap">
-        <table id="infos" class="data">
-          <thead><tr><th>Title</th><th>Status</th><th>You have</th><th>SeaDex best</th></tr></thead>
-          <tbody></tbody>
-        </table>
-      </div>
-    </details>
   </section>
 
   <!-- Activity -->

@@ -58,6 +58,11 @@ func (c *Comparer) fillAlt(m *match.Match, d *align.Decision, f *Finding) *Findi
 	if f == nil || (f.Status != StatusBetter && f.Status != StatusNewerRevision) {
 		return f
 	}
+	return c.addAlt(m, d, f)
+}
+
+// addAlt is fillAlt without its upgrade-only gate, for Extended mode's rows.
+func (c *Comparer) addAlt(m *match.Match, d *align.Decision, f *Finding) *Finding {
 	pool := c.alternatives(&m.Entry)
 	if len(pool) == 0 {
 		return f

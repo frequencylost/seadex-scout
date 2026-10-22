@@ -159,6 +159,8 @@ func buildScout(ctx context.Context, cfg *config.Config, server *indexer.Indexer
 			Filter:          filterOptions(cfg),
 			ExcludeSpecials: cfg.ExcludeSpecials,
 			AnimeBytes:      cfg.AnimeBytes,
+			// The built-in dashboard lists every entry, not only the exceptions.
+			Extended: true,
 		}),
 		Notifier: notify.NewNotifier(c.log, cfg.IgnoreFindings),
 		Auditor:  audit.New(auditConfig(cfg)),

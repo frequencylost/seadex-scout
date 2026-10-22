@@ -244,10 +244,10 @@ func (n *Notifier) emit(r *row, pass int64) {
 	case isUpgrade(&r.f):
 		kvs = append(kvs, "rank_alt", r.ranks[viewAlt], "rank_none", r.ranks[viewNone])
 		kvs = append(kvs, sizeKVs(&r.f)...)
-		kvs = append(kvs, altKVs(&r.f)...)
 	case isManualReview(&r.f):
 		kvs = append(kvs, "rank_check", r.checkRank)
 	}
+	kvs = append(kvs, forkKVs(&r.f)...)
 	n.log.Log(context.Background(), level(r.f.Status), message(r.f.Status), kvs...)
 }
 
@@ -605,6 +605,12 @@ func message(status compare.Status) string {
 		return "SeaDex lists a theoretical best only"
 	case compare.StatusUnverifiable:
 		return "release group unverifiable, manual review"
+	case compare.StatusNotDownloaded:
+		return "SeaDex entry not downloaded"
+	case compare.StatusAtBest:
+		return "library holds the SeaDex best"
+	case compare.StatusNoBest:
+		return "SeaDex lists no best you can get"
 	default:
 		return "seadex finding"
 	}

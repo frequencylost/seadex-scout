@@ -49,6 +49,12 @@ const (
 	// sentinel) and could hide an alignment - so neither a confident aligned
 	// silence nor a better_release warning is honest.
 	StatusUnverifiable Status = "unverifiable"
+	// StatusNotDownloaded, StatusAtBest and StatusNoBest are this fork's
+	// dashboard rows (Config.Extended): an entry with no file on disk, one
+	// already at SeaDex's best, and one SeaDex names no obtainable best for.
+	StatusNotDownloaded Status = "not_downloaded"
+	StatusAtBest        Status = "at_best"
+	StatusNoBest        Status = "no_best"
 )
 
 // ReleaseLink is one obtainable source for a recommended release: the tracker,
@@ -140,6 +146,13 @@ type Finding struct {
 	// dashboard to show beside the best one. It is zero when the entry lists
 	// no alt the operator can obtain (see fillAlt).
 	Alt AltRelease
+	// LibraryBytes is the size of the files the unit holds on disk, zero when
+	// unknown. EntryIncomplete marks a SeaDex entry flagged incomplete, and
+	// NoBestReason says why a row names no best release ("theoretical",
+	// "incomplete" or "unobtainable"). All three are set in Extended mode only.
+	LibraryBytes    int64
+	EntryIncomplete bool
+	NoBestReason    string
 }
 
 // --- Comparison flow ---
@@ -151,6 +164,7 @@ type Comparer struct {
 	opts            filter.Options
 	excludeSpecials bool
 	animeBytes      bool
+	extended        bool
 }
 
 // Config configures a Comparer.
@@ -168,6 +182,11 @@ type Config struct {
 	// obtainability check; public trackers are always considered. Off means
 	// AnimeBytes releases are invisible.
 	AnimeBytes bool
+	// Extended turns on this fork's dashboard rows: entries with no file,
+	// entries already at SeaDex's best and entries with no obtainable best are
+	// reported too, an incomplete entry with a best stays an upgrade, and every
+	// row carries sizes and the headline alt (see fork.go).
+	Extended bool
 }
 
 // New builds a Comparer from cfg.
@@ -178,6 +197,7 @@ func New(cfg Config) *Comparer {
 		opts:            cfg.Filter,
 		excludeSpecials: cfg.ExcludeSpecials,
 		animeBytes:      cfg.AnimeBytes,
+		extended:        cfg.Extended,
 	}
 }
 
@@ -230,33 +250,36 @@ func (c *Comparer) compareOne(m *match.Match) *Finding {
 			"anilist_id", entry.AniListID, "series", logattr.Cap(m.Item.Title), "series_anilist_ids", m.Item.AniListIDs)
 	}
 	if d.Outcome == align.OutcomeNoFile || d.Outcome == align.OutcomeWithheld || d.Outcome == align.OutcomeAligned {
-		return nil
+		return c.extendedRow(m, &d, recommended, recGroups)
 	}
 	base := baseFinding(m, &d)
 	listed, alt := c.listedGroups(entry)
 	base.AltGroups = alt
 	switch d.Outcome {
 	case align.OutcomeNoBest:
+		if c.extended {
+			return c.enrich(m, &d, nil, noBestRow(entry, &base, &d))
+		}
 		return emptyResult(entry, &base)
 	case align.OutcomeSuperseded:
 		pool, exact := supersededPool(&d, recommended, listing.BestRevisions)
-		f := supersededResult(entry, &base, &d, pool)
+		f := c.keepUpgrade(entry, supersededResult(entry, &base, &d, pool), StatusNewerRevision)
 		if !exact {
-			return c.fillAlt(m, &d, f)
+			return c.enrich(m, &d, nil, f)
 		}
-		return c.fillAlt(m, &d, sized(m, &d, pool, f))
+		return c.enrich(m, &d, nil, sized(m, &d, pool, f))
 	case align.OutcomeUnverifiable:
 		fillBest(&base, recommended, recGroups)
-		return finalize(&base, StatusUnverifiable)
+		return c.enrich(m, &d, recommended, finalize(&base, StatusUnverifiable))
 	case align.OutcomeMixed:
 		fillBest(&base, recommended, recGroups)
-		return finalize(&base, StatusMixedGroup)
+		return c.enrich(m, &d, recommended, finalize(&base, StatusMixedGroup))
 	case align.OutcomeDiverged:
-		f := betterResult(entry, &base, recommended, recGroups)
+		f := c.keepUpgrade(entry, betterResult(entry, &base, recommended, recGroups), StatusBetter)
 		if f.Status == StatusBetter {
 			f.Tier = tierOf(m, recGroups, listed)
 		}
-		return c.fillAlt(m, &d, sized(m, &d, recommended, f))
+		return c.enrich(m, &d, nil, sized(m, &d, recommended, f))
 	default:
 		// Every Outcome the shared linearization produces is handled above.
 		fillBest(&base, recommended, recGroups)
