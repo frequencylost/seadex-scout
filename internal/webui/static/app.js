@@ -469,7 +469,21 @@ function defaultOrder(x, y, showOptional) {
 function changeOf(a, prefix) {
   const change = num(a[prefix + "size_change_bytes"]);
   if (change !== null) return change;
-  return a.status === "not_downloaded" ? num(a[prefix + "recommended_bytes"]) : null;
+  if (a.status === "not_downloaded") return num(a[prefix + "recommended_bytes"]);
+  return approxChange(a, prefix);
+}
+
+// approxChange is the fallback when the scout could not tie a release's files
+// to the files on disk one by one: the download against everything the
+// season or film holds (the On disk column). It is right when the release
+// covers what you have, so it is shown marked as approximate.
+function approxChange(a, prefix) {
+  const size = num(a[prefix + "recommended_bytes"]), disk = num(a.library_bytes);
+  return size !== null && disk !== null && disk > 0 ? size - disk : null;
+}
+
+function isApprox(a, prefix) {
+  return num(a[prefix + "size_change_bytes"]) === null && a.status !== "not_downloaded" && approxChange(a, prefix) !== null;
 }
 
 function renderFindings(table, list, now, emptyText) {
@@ -520,10 +534,10 @@ function findingRow(f, now) {
     el("td", {}, el("span", { class: "tag " + why.cls, text: why.text })),
     el("td", { text: a.status === "not_downloaded" ? "–" : groupWithRevision(a.current_group, newer ? a.current_revision : "") }),
     best,
-    a.recommended_group ? sizeCell(a.recommended_bytes, changeOf(a, "")) : el("td", { class: "num", text: "–" }),
+    a.recommended_group ? sizeCell(a.recommended_bytes, changeOf(a, ""), isApprox(a, "")) : el("td", { class: "num", text: "–" }),
     el("td", {}, el("div", { class: "links" }, bestLinks)),
     altCell(a, entry),
-    a.alt_group ? sizeCell(a.alt_recommended_bytes, changeOf(a, "alt_")) : el("td", { class: "num", text: "–" }),
+    a.alt_group ? sizeCell(a.alt_recommended_bytes, changeOf(a, "alt_"), isApprox(a, "alt_")) : el("td", { class: "num", text: "–" }),
     el("td", {}, el("div", { class: "links" }, releaseLinks(a, "alt_"))),
     el("td", { class: "num", text: a.first_seen ? ago(num(a.first_seen), now) : "–" }));
 }
@@ -545,11 +559,12 @@ function noBestDetail(a) {
 }
 
 // sizeCell shows a download size with the size change it brings underneath.
-function sizeCell(bytes, change) {
+// An approximate change is marked "≈" and says why on hover.
+function sizeCell(bytes, change, approx) {
   const c = num(change);
-  return el("td", { class: "num" },
-    fmtBytes(bytes),
-    el("span", { class: "sub " + (c > 0 ? "pos" : c < 0 ? "neg" : ""), text: fmtBytes(change, true) }));
+  const sub = el("span", { class: "sub " + (c > 0 ? "pos" : c < 0 ? "neg" : ""), text: (approx ? "≈ " : "") + fmtBytes(change, true) });
+  if (approx) sub.title = "Approximate: the download against everything on disk for this season or film, because its files could not be matched to yours one by one";
+  return el("td", { class: "num" }, fmtBytes(bytes), sub);
 }
 
 // releaseLinks lists a release's sources, Nyaa first. prefix is "" for SeaDex
