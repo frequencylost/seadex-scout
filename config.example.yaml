@@ -45,7 +45,11 @@ mode: "daemon" # daemon (scheduled) | report (one-shot, exit)
 # disabled or 0 for no internal timer, then trigger each pass with the `poll`
 # subcommand. In that mode every `poll` runs as a separate process and so is a
 # full pass. Schedule it around 24h apart rather than every 15m.
-poll_interval: "15m"
+#
+# This fork's starter uses 1h, to go easier on SeaDex: 24 small checks a day
+# instead of 96, one of them the daily full pass. New releases then reach the
+# dashboard and the indexer feed up to an hour after SeaDex lists them.
+poll_interval: "1h"
 
 log:
   level: "info" # debug | info | warn | error

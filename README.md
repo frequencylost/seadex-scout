@@ -132,7 +132,7 @@ The settings most people change:
 | Key | Default | Description |
 | --- | --- | --- |
 | `mode` | `daemon` | `daemon` runs on a schedule. `report` writes one report and exits. |
-| `poll_interval` | `15m` | How often to check SeaDex for changes. Minimum `15m`. `off` hands scheduling to an outside tool. |
+| `poll_interval` | `1h` in this fork's starter config (`15m` upstream) | How often to check SeaDex for changes. Minimum `15m`. A full check still runs once a day. `off` hands scheduling to an outside tool. |
 | `animebytes` | `false` | Set `true` when you have an AnimeBytes account, to include its releases and links. |
 | `filters.exclude_remux` | `false` | Leave out releases classified as remux. |
 | `filters.require_dual_audio` | `false` | Leave out releases that are not dual audio. |

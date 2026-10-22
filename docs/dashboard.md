@@ -8,6 +8,8 @@ seadex-scout reports everything through its structured log, as [Monitoring and a
 
 As a result, the two dashboards show the same numbers, the scout's checks are unchanged, and the container log stays the same. You can still load the Grafana dashboard and the Loki rules alongside it.
 
+The page refreshes every 30 seconds, but only from the container's own memory. It never contacts SeaDex. Only the scout's check schedule does: in this fork's starter config, a quick check every hour (`poll_interval: "1h"`), one of which is the daily full check. The attention tiles scale with `poll_interval`. **Last check** allows three intervals, as the container's health check does. A lasting problem counts as cleared once one and a half intervals pass without it being logged again.
+
 The dashboard reads the lines at `info` even when `log.level` is `warn` or `error`, so raising the level does not empty it.
 
 Its state goes in `webui-state.json` beside `config.yaml`, saved every minute and at shutdown. After a restart it shows the last findings, library overview and health until the next check replaces them. Delete the file to start over.

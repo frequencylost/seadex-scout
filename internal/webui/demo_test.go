@@ -25,10 +25,10 @@ func TestDemo(t *testing.T) {
 	now := time.Now()
 	pass := now.UnixMilli()
 
-	log.Info("configuration loaded", "sonarr_enabled", true, "radarr_enabled", true, "poll_interval", "15m0s",
+	log.Info("configuration loaded", "sonarr_enabled", true, "radarr_enabled", true, "poll_interval", "1h0m0s",
 		"exclude_remux", false, "require_dual_audio", true, "exclude_specials", false, "animebytes", false,
 		"include_tags", 0, "exclude_tags", 1, "ignored_findings", 2, "run_mode", "daemon")
-	log.Info("seadex-scout started", "poll_interval", "15m0s", "indexer", true)
+	log.Info("seadex-scout started", "poll_interval", "1h0m0s", "indexer", true)
 	for i := range 14 {
 		d := time.Duration(18+i%9)*time.Minute + 13*time.Second
 		if i == 9 {

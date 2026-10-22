@@ -1265,13 +1265,18 @@ func TestExistingLiteralConfigsKeepTheirBehaviour(t *testing.T) {
 	})
 }
 
+// forkStarterPollInterval is the poll_interval config.example.yaml ships in this fork.
+const forkStarterPollInterval = time.Hour
+
 // TestExampleConfigMatchesLoader pins the rest of the shipped starter against the
 // loader: every non-connection default it carries is the loader's own.
 func TestExampleConfigMatchesLoader(t *testing.T) {
 	t.Parallel()
 	c := loadExample(t, nil)
-	if c.PollInterval != DefaultPollInterval || c.PollExternal {
-		t.Errorf("PollInterval = %v external=%v, want built-in %v", c.PollInterval, c.PollExternal, DefaultPollInterval)
+	// This fork's starter deliberately checks every 1h, to go easier on SeaDex; the
+	// built-in default stays 15m so upstream's alert-rule windows still hold.
+	if c.PollInterval != forkStarterPollInterval || c.PollExternal {
+		t.Errorf("PollInterval = %v external=%v, want the fork's starter %v", c.PollInterval, c.PollExternal, forkStarterPollInterval)
 	}
 	if c.RunMode != RunModeDaemon {
 		t.Errorf("RunMode = %q, want %q", c.RunMode, RunModeDaemon)

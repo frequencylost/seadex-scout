@@ -218,8 +218,12 @@ function attentionItems(snap) {
     snap.last_check ? new Date(snap.last_check.time).getTime() : 0,
     snap.reconcile_started ? new Date(snap.reconcile_started).getTime() : 0,
   );
-  if (now - Math.max(lastCheck, started) > 3 * HOUR) {
-    items.push({ cls: "bad", title: "Last check", text: `No check has finished or started in 3 hours (last ${ago(lastCheck || null, now)}).` });
+  // The same allowance as the container's own health check: three check
+  // intervals, and never less than 3 hours.
+  const interval = pollIntervalMs(snap);
+  const allowance = Math.max(3 * HOUR, 3 * (interval || 0));
+  if (interval !== -1 && now - Math.max(lastCheck, started) > allowance) {
+    items.push({ cls: "bad", title: "Last check", text: `No check has finished or started in ${fmtSpan(allowance)} (last ${ago(lastCheck || null, now)}).` });
   }
   const lastFull = snap.reconcile_complete ? new Date(snap.reconcile_complete).getTime() : 0;
   if (now - Math.max(lastFull, started) > 72 * HOUR) {
@@ -230,7 +234,7 @@ function attentionItems(snap) {
     items.push({ cls: "warn", title: `Errors in 7 days: ${errors.length}`, text: errors[errors.length - 1].msg, tab: "health" });
   }
   for (const [cond, line] of Object.entries(snap.conditions || {})) {
-    if (now - new Date(line.time).getTime() > HOUR) continue;
+    if (!conditionActive(snap, line, now)) continue;
     const lib = cond.startsWith("library-");
     const arr = line.attrs && line.attrs.arr ? ` (${arrName(line.attrs.arr)})` : "";
     items.push({
@@ -245,6 +249,31 @@ function attentionItems(snap) {
     items.push({ cls: "warn", title: "AnimeBytes feed", text: `${feed.attrs.ab_releases_skipped} AnimeBytes releases held back: indexer.ab_passkey is not set.` });
   }
   return items;
+}
+
+// pollIntervalMs returns the configured check interval in milliseconds, -1
+// when checks are triggered from outside (poll_interval: off), or null when
+// the configuration has not been logged since this start.
+function pollIntervalMs(snap) {
+  const raw = snap.config && snap.config.attrs && snap.config.attrs.poll_interval;
+  if (raw === "external") return -1;
+  const secs = durationSeconds(raw);
+  return secs ? secs * 1000 : null;
+}
+
+// conditionActive reports whether a lasting problem still holds. The scout logs
+// it again on every check while it lasts, so it has cleared once a check has
+// gone by without it: an hour, or one and a half check intervals when longer.
+function conditionActive(snap, line, now) {
+  const interval = pollIntervalMs(snap);
+  const window = Math.max(HOUR, 1.5 * (interval > 0 ? interval : 0));
+  return now - new Date(line.time).getTime() <= window;
+}
+
+function fmtSpan(ms) {
+  if (ms >= DAY && ms % DAY === 0) return `${ms / DAY} day${ms === DAY ? "" : "s"}`;
+  if (ms >= HOUR) return `${+(ms / HOUR).toFixed(1)} hour${ms === HOUR ? "" : "s"}`;
+  return `${Math.round(ms / 60e3)} minutes`;
 }
 
 function recentErrors(snap) {
@@ -269,7 +298,14 @@ function render() {
   if (snap.pass && snap.pass.id) sub.push(`Findings from ${ago(snap.pass.at, new Date(snap.now).getTime())}`);
   else sub.push("No findings yet. The first full check can take 25 minutes or more");
   $("subtitle").textContent = sub.join(" · ");
-  $("footer-text").textContent = `Updated ${fmtTime(snap.now)} · refreshes every ${REFRESH_MS / 1000}s`;
+  // The page's refresh reads this container only; SeaDex is contacted solely by
+  // the scout's own check schedule, so say which is which.
+  const interval = pollIntervalMs(snap);
+  const lastSeaDex = snap.last_check ? `, last ${ago(snap.last_check.time, new Date(snap.now).getTime())}` : "";
+  const schedule = interval === -1 ? "SeaDex checks are started from outside the container"
+    : interval ? `SeaDex checked every ${fmtSpan(interval)}${lastSeaDex}, full check daily`
+    : "SeaDex checked on the scout's schedule";
+  $("footer-text").textContent = `Page refreshed ${fmtTime(snap.now)} from this container every ${REFRESH_MS / 1000}s (never contacts SeaDex) · ${schedule}`;
 
   const box = $("attention");
   box.hidden = items.length === 0;
@@ -494,7 +530,7 @@ function renderHealth(snap) {
 
   const conds = Object.entries(snap.conditions || {}).sort((a, b) => b[1].time.localeCompare(a[1].time));
   $("conditions").replaceChildren(...(conds.length ? conds.map(([cond, line]) => {
-    const active = now - new Date(line.time).getTime() <= HOUR;
+    const active = conditionActive(snap, line, now);
     return el("div", { class: "alert " + (active ? (cond.startsWith("library-") ? "bad" : "info") : "cleared") },
       el("strong", { text: `${cond}${active ? "" : " (cleared)"}` }),
       el("span", { text: `${line.msg} · last logged ${ago(line.time, now)}` }));
