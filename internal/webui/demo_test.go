@@ -70,6 +70,15 @@ func TestDemo(t *testing.T) {
 		if s.size > 0 {
 			kvs = append(kvs, "recommended_bytes", s.size, "size_change_bytes", s.change)
 		}
+		if i%3 != 2 {
+			kvs = append(kvs, "alt_group", "Vodes", "alt_nyaa_url", fmt.Sprintf("https://nyaa.si/view/%d", 1800000+i),
+				"alt_recommended_bytes", s.size/3, "alt_size_change_bytes", s.change/3-(1<<30))
+			for k := 0; k < len(kvs); k += 2 {
+				if kvs[k] == "alt_groups" {
+					kvs[k+1] = "vodes,judas"
+				}
+			}
+		}
 		log.Warn("better release available", kvs...)
 	}
 	log.Info("series spans multiple release groups, manual review", "title", "Cowboy Bebop", "al_id", 1,

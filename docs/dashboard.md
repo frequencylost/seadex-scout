@@ -20,7 +20,9 @@ Its state goes in `webui-state.json` beside `config.yaml`, saved every minute an
   - Attention tiles, shown only while something needs a look. They use the same conditions as the Grafana tiles and Loki alerts.
   - The number of upgrades, findings to check by hand, the share of your anime at SeaDex's best or an alt, and when the last check ran.
   - The **Library overview** bars from the daily full check.
-  - **Upgrades available**, with filters, sortable columns, sizes and links to Sonarr or Radarr, SeaDex and the release. **Show optional upgrades** adds the upgrades where you already have a SeaDex alt.
+  - **Upgrades available**, with filters and sortable columns. SeaDex's best release and its headline alt each get a **Size / change** column and a **Link** column, Nyaa first. The size is the download, and the change below it is how much your library grows or shrinks if you take it. Any other alt groups SeaDex lists appear under the alt's name. **Show optional upgrades** adds the upgrades where you already have a SeaDex alt.
+
+    The alt's size and link come from attributes this fork adds to the `better release available` line: `alt_group`, `alt_nyaa_url`, `alt_public_url`, `alt_ab_url`, `alt_recommended_bytes` and `alt_size_change_bytes`. They are worked out the same way as the best release's and stay out of the log contract the alert rules read.
   - **Check by hand**, plus the informational findings.
 - **Activity**: upgrades entering and leaving the list.
 - **Scout health**:

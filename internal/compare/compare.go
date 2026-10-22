@@ -136,6 +136,10 @@ type Finding struct {
 	// real season or group, so CurrentGroup is an aggregate rather than an exact
 	// per-unit attribution. The audit report renders the same fact as "(approx)".
 	Approx bool
+	// Alt describes SeaDex's headline alt release for an upgrade, for the
+	// dashboard to show beside the best one. It is zero when the entry lists
+	// no alt the operator can obtain (see fillAlt).
+	Alt AltRelease
 }
 
 // --- Comparison flow ---
@@ -238,9 +242,9 @@ func (c *Comparer) compareOne(m *match.Match) *Finding {
 		pool, exact := supersededPool(&d, recommended, listing.BestRevisions)
 		f := supersededResult(entry, &base, &d, pool)
 		if !exact {
-			return f
+			return c.fillAlt(m, &d, f)
 		}
-		return sized(m, &d, pool, f)
+		return c.fillAlt(m, &d, sized(m, &d, pool, f))
 	case align.OutcomeUnverifiable:
 		fillBest(&base, recommended, recGroups)
 		return finalize(&base, StatusUnverifiable)
@@ -252,7 +256,7 @@ func (c *Comparer) compareOne(m *match.Match) *Finding {
 		if f.Status == StatusBetter {
 			f.Tier = tierOf(m, recGroups, listed)
 		}
-		return sized(m, &d, recommended, f)
+		return c.fillAlt(m, &d, sized(m, &d, recommended, f))
 	default:
 		// Every Outcome the shared linearization produces is handled above.
 		fillBest(&base, recommended, recGroups)

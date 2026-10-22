@@ -409,8 +409,9 @@ function upgradeSortValue(f, key, showOptional) {
     case "why": return whyOf(a).text;
     case "current": return (a.current_group || "").toLowerCase();
     case "best": return (a.recommended_group || "").toLowerCase();
-    case "size": return num(a.recommended_bytes) ?? -Infinity;
     case "change": return num(a.size_change_bytes) ?? -Infinity;
+    case "alt": return (a.alt_group || a.alt_groups || "~").toLowerCase();
+    case "altchange": return num(a.alt_size_change_bytes) ?? -Infinity;
     case "first": return num(a.first_seen) ?? 0;
     default: {
       const r = num(showOptional ? a.rank_none : a.rank_alt);
@@ -443,24 +444,48 @@ function renderUpgrades(list, now) {
   setRows($("upgrades").tBodies[0], rows.map((f) => {
     const a = f.attrs;
     const why = whyOf(a);
-    const change = num(a.size_change_bytes);
-    const links = [];
-    if (a.nyaa_url) links.push(link(a.nyaa_url, "Nyaa"));
-    if (a.public_url) links.push(link(a.public_url, a.public_tracker || "Tracker"));
-    if (a.ab_url) links.push(link(a.ab_url, a.ab_tracker || "AnimeBytes"));
-    if (!links.length && a.release_url) links.push(link(a.release_url, a.tracker || "Release"));
     const tags = a.seadex_tags ? el("span", { class: "sub", text: a.seadex_tags }) : null;
+    const bestLinks = releaseLinks(a, "");
+    if (!bestLinks.length && a.release_url) bestLinks.push(link(a.release_url, a.tracker || "Release"));
     return el("tr", {},
       el("td", {}, link(a.arr_url, a.title || "?"), el("span", { class: "sub", text: `${arrName(a.arr)} · ${seasonLabel(a)}` })),
       el("td", {}, el("span", { class: "tag " + why.cls, text: why.text })),
       el("td", { text: groupWithRevision(a.current_group, a.status === "newer_revision" ? a.current_revision : "") }),
       el("td", {}, link(a.al_id ? SEADEX + a.al_id + "/" : "", groupWithRevision(a.recommended_group, a.status === "newer_revision" ? a.recommended_revision : "")), tags),
-      el("td", { text: a.alt_groups || "–" }),
-      el("td", { class: "num", text: fmtBytes(a.recommended_bytes) }),
-      el("td", { class: "num " + (change > 0 ? "pos" : change < 0 ? "neg" : ""), text: fmtBytes(a.size_change_bytes, true) }),
-      el("td", {}, el("div", { class: "links" }, links)),
+      sizeCell(a.recommended_bytes, a.size_change_bytes),
+      el("td", {}, el("div", { class: "links" }, bestLinks)),
+      altCell(a),
+      a.alt_group ? sizeCell(a.alt_recommended_bytes, a.alt_size_change_bytes) : el("td", { class: "num", text: "–" }),
+      el("td", {}, el("div", { class: "links" }, releaseLinks(a, "alt_"))),
       el("td", { class: "num", text: a.first_seen ? ago(num(a.first_seen), now) : "–" }));
-  }), 9, state.snap.pass && state.snap.pass.id ? "No upgrades. Your library is on SeaDex's picks." : "Waiting for the first check.");
+  }), 10, state.snap.pass && state.snap.pass.id ? "No upgrades. Your library is on SeaDex's picks." : "Waiting for the first check.");
+}
+
+// sizeCell shows a download size with the size change it brings underneath.
+function sizeCell(bytes, change) {
+  const c = num(change);
+  return el("td", { class: "num" },
+    fmtBytes(bytes),
+    el("span", { class: "sub " + (c > 0 ? "pos" : c < 0 ? "neg" : ""), text: fmtBytes(change, true) }));
+}
+
+// releaseLinks lists a release's sources, Nyaa first. prefix is "" for SeaDex
+// best and "alt_" for the alt release.
+function releaseLinks(a, prefix) {
+  const links = [];
+  if (a[prefix + "nyaa_url"]) links.push(link(a[prefix + "nyaa_url"], "Nyaa"));
+  if (a[prefix + "public_url"]) links.push(link(a[prefix + "public_url"], a[prefix + "public_tracker"] || "Tracker"));
+  if (a[prefix + "ab_url"]) links.push(link(a[prefix + "ab_url"], a[prefix + "ab_tracker"] || "AnimeBytes"));
+  return links;
+}
+
+// altCell names the alt release shown beside it, with any other alt groups
+// SeaDex lists underneath.
+function altCell(a) {
+  const all = typeof a.alt_groups === "string" && a.alt_groups ? a.alt_groups.split(",") : [];
+  if (!a.alt_group) return el("td", { text: all.join(", ") || "–" });
+  const others = all.filter((g) => g.toLowerCase() !== a.alt_group.toLowerCase());
+  return el("td", {}, a.alt_group, others.length ? el("span", { class: "sub", text: "also " + others.join(", ") }) : null);
 }
 
 function renderChecks(list, now) {
@@ -762,7 +787,7 @@ function init() {
     th.addEventListener("click", () => {
       const key = th.dataset.sort;
       const s = state.upgradesSort;
-      state.upgradesSort = s.key === key ? { key, asc: !s.asc } : { key, asc: key === "title" || key === "current" || key === "best" || key === "why" };
+      state.upgradesSort = s.key === key ? { key, asc: !s.asc } : { key, asc: ["title", "current", "best", "why", "alt"].includes(key) };
       if (state.snap) renderOverview(state.snap);
     });
   }

@@ -280,8 +280,8 @@ td.empty, p.empty { color: var(--muted); text-align: center; padding: 18px; }
 .tag.warn { background: var(--warn-bg); color: var(--warn); }
 .tag.bad { background: var(--bad-bg); color: var(--bad); }
 .tag.info { background: var(--info-bg); color: var(--accent); }
-.pos { color: var(--bad); }
-.neg { color: var(--good); }
+.pos, td .sub.pos { color: var(--bad); }
+.neg, td .sub.neg { color: var(--good); }
 
 .bars { display: flex; flex-direction: column; gap: 6px; }
 .bar-row { display: grid; grid-template-columns: 210px 1fr 70px; align-items: center; gap: 10px; font-size: 13px; }

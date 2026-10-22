@@ -191,6 +191,7 @@ func boundRetained(f *compare.Finding) {
 		f.Links[i].Tracker = capRetainedElem(f.Links[i].Tracker)
 		f.Links[i].URL = capRetainedElem(f.Links[i].URL)
 	}
+	boundRetainedAlt(f)
 }
 
 // capRetainedElem bounds one element of a retained slice. capAttr runs first so
@@ -243,6 +244,7 @@ func (n *Notifier) emit(r *row, pass int64) {
 	case isUpgrade(&r.f):
 		kvs = append(kvs, "rank_alt", r.ranks[viewAlt], "rank_none", r.ranks[viewNone])
 		kvs = append(kvs, sizeKVs(&r.f)...)
+		kvs = append(kvs, altKVs(&r.f)...)
 	case isManualReview(&r.f):
 		kvs = append(kvs, "rank_check", r.checkRank)
 	}
