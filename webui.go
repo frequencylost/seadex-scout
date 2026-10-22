@@ -72,6 +72,19 @@ func (w *webUIRuntime) start(ctx context.Context, cfg *config.Config) func() {
 	} else {
 		log.Warn("dashboard cannot start reports: the executable path is unknown", "error", err)
 	}
+	var sonarr, radarr webui.Arr
+	if cfg.SonarrEnabled() {
+		sonarr = webui.Arr{URL: cfg.SonarrURL, APIKey: cfg.SonarrAPIKey}
+	}
+	if cfg.RadarrEnabled() {
+		radarr = webui.Arr{URL: cfg.RadarrURL, APIKey: cfg.RadarrAPIKey}
+	}
+	polled := make(chan struct{})
+	go func() {
+		defer close(polled)
+		webui.NewMonitoredPoller(sonarr, radarr, w.store, log).Run(ctx)
+	}()
+
 	srv := webui.NewServer(webui.Options{
 		Addr:      w.addr,
 		Username:  cmp.Or(os.Getenv(envWebUIUsername), "admin"),
@@ -124,6 +137,7 @@ func (w *webUIRuntime) start(ctx context.Context, cfg *config.Config) func() {
 		close(quit)
 		<-served
 		<-saved
+		<-polled
 		if err := w.store.Save(); err != nil {
 			log.Warn("dashboard could not save its state", "error", err)
 		}

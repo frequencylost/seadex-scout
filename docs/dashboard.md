@@ -20,7 +20,12 @@ Its state goes in `webui-state.json` beside `config.yaml`, saved every minute an
   - Attention tiles, shown only while something needs a look. They use the same conditions as the Grafana tiles and Loki alerts.
   - The number of upgrades, findings to check by hand, the share of your anime at SeaDex's best or an alt, and when the last check ran.
   - The **Library overview** bars from the daily full check.
-  - A filter bar for both tables: title or group, Sonarr or Radarr, what to show, and **Show optional upgrades**, which adds the upgrades where you already have a SeaDex alt.
+  - A filter bar for both tables:
+    - title or group, Sonarr or Radarr, and what to show;
+    - **Show optional upgrades**, which adds the upgrades where you already have a SeaDex alt;
+    - **Show unmonitored**, off by default, which adds series, seasons and movies set to unmonitored in Sonarr or Radarr.
+
+    The dashboard reads the monitored flags straight from the Sonarr and Radarr APIs (`/api/v3/series` and `/api/v3/movie`, or `/api/v5` on Sonarr 5) every 15 minutes, so a change there shows without waiting for a SeaDex check. A row counts as monitored until its flags have been read.
   - **Upgrades available** lists everything with something to do. The **Why** column says what:
     - Upgrades come first: **Newer version** of your group, **Neither best nor alt**, and optionally **SeaDex alt**.
     - Then **Not downloaded**: seasons and films Sonarr or Radarr has, with no file yet, that SeaDex has an entry for.

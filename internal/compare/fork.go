@@ -122,6 +122,9 @@ func (c *Comparer) enrich(m *match.Match, d *align.Decision, pool []candidate, f
 		return c.fillAlt(m, d, f)
 	}
 	f.LibraryBytes = libraryBytes(m.Item, d)
+	if m.Item != nil {
+		f.ArrID = m.Item.ArrID
+	}
 	if f.ReleaseBytes == 0 && len(pool) > 0 {
 		if set, ok := downloadSet(pool); ok {
 			if total, ok := downloadBytes(set); ok {

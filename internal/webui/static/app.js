@@ -307,6 +307,19 @@ function render() {
 
 // ---------- render: overview ----------
 
+// unmonitoredTest returns whether a finding's series, season or movie is
+// unmonitored in Sonarr or Radarr. Rows read before the scout logged arr ids,
+// or before the flags were read, count as monitored.
+function unmonitoredTest(snap) {
+  const keys = new Set((snap.monitored && snap.monitored.unmonitored) || []);
+  return (f) => {
+    const a = f.attrs;
+    if (!a.arr_id || !keys.size) return false;
+    const base = `${a.arr}:${a.arr_id}`;
+    return keys.has(base) || (a.arr === "sonarr" && a.season !== undefined && keys.has(`${base}:${a.season}`));
+  };
+}
+
 // The row kinds of the two finding tables, by status.
 const UPGRADE = new Set(["better_release", "newer_revision"]);
 const GROUPS = new Set(["mixed_group_manual", "unverifiable"]);
@@ -344,7 +357,14 @@ function renderOverview(snap) {
   const now = new Date(snap.now).getTime();
   const ready = Boolean(snap.pass && snap.pass.id);
   const showOptional = $("upgrades-optional").checked;
-  const rows = (snap.findings || []).filter((f) => kindOf(f) !== "other");
+  const unmonitored = unmonitoredTest(snap);
+  const showUnmonitored = $("upgrades-unmonitored").checked;
+  const all = (snap.findings || []).filter((f) => kindOf(f) !== "other");
+  const rows = showUnmonitored ? all : all.filter((f) => !unmonitored(f));
+  const hidden = all.length - rows.length;
+  const m = snap.monitored || {};
+  $("unmonitored-note").textContent = m.error && !m.at ? "Could not read monitored flags from Sonarr or Radarr"
+    : !showUnmonitored && hidden ? `${hidden} unmonitored hidden` : "";
   const isOptional = (f) => f.attrs.status === "better_release" && f.attrs.current_tier === "alt";
   const todo = rows.filter((f) => kindOf(f) !== "atbest" && (showOptional || !isOptional(f)));
   const atBest = rows.filter((f) => kindOf(f) === "atbest");
@@ -852,7 +872,7 @@ async function loadLogs() {
 function init() {
   initTheme();
   initTabs();
-  for (const id of ["upgrades-search", "upgrades-arr", "upgrades-why", "upgrades-optional"]) {
+  for (const id of ["upgrades-search", "upgrades-arr", "upgrades-why", "upgrades-optional", "upgrades-unmonitored"]) {
     $(id).addEventListener("input", () => state.snap && renderOverview(state.snap));
   }
   $("report-run").addEventListener("click", runReport);

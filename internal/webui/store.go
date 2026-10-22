@@ -137,6 +137,8 @@ type Store struct {
 	pending map[int64][]Line
 	logs    []Line
 	job     ReportJob
+	// monitored is not persisted: it is read again within a minute of a start.
+	monitored Monitored
 }
 
 // NewStore returns an empty Store that persists to path ("" keeps it in memory).
@@ -375,6 +377,7 @@ type Snapshot struct {
 	StartedAt time.Time `json:"started_at"`
 	Config    *Line     `json:"config,omitempty"`
 	ReportJob ReportJob `json:"report_job"`
+	Monitored Monitored `json:"monitored"`
 	state
 }
 
@@ -392,7 +395,9 @@ func (st *Store) Snapshot() Snapshot {
 	s.Conditions = maps.Clone(s.Conditions)
 	s.Views = maps.Clone(s.Views)
 	s.Indexer.ByScope = maps.Clone(s.Indexer.ByScope)
-	return Snapshot{Now: st.now(), StartedAt: st.started, Config: st.config, ReportJob: st.job, state: s}
+	m := st.monitored
+	m.Unmonitored = slices.Clone(m.Unmonitored)
+	return Snapshot{Now: st.now(), StartedAt: st.started, Config: st.config, ReportJob: st.job, Monitored: m, state: s}
 }
 
 // Logs returns the recent log lines, newest last.

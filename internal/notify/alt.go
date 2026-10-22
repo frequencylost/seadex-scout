@@ -38,6 +38,9 @@ func forkKVs(f *compare.Finding) []any {
 	if !isUpgrade(f) {
 		kvs = append(kvs, sizeKVs(f)...)
 	}
+	if f.ArrID > 0 {
+		kvs = append(kvs, "arr_id", f.ArrID)
+	}
 	if f.LibraryBytes > 0 {
 		kvs = append(kvs, "library_bytes", f.LibraryBytes)
 	}

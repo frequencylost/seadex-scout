@@ -56,7 +56,7 @@ func TestDemo(t *testing.T) {
 		{"Spirited Away", "radarr", "Tsundere-Raws", "alt", "Arid", "better_release", 0, 14 << 30, 3 << 30},
 	}
 	for i, s := range shows {
-		kvs := []any{"title", s.title, "al_id", 1000 + i, "arr", s.arr, "arr_url", "https://example.com/" + s.arr,
+		kvs := []any{"title", s.title, "al_id", 1000 + i, "arr", s.arr, "arr_id", 10 + i, "arr_url", "https://example.com/" + s.arr,
 			"season", s.season, "status", s.status, "current_group", s.cur, "current_tier", s.tier,
 			"recommended_group", s.best, "alt_groups", "", "nyaa_url", fmt.Sprintf("https://nyaa.si/view/%d", 1700000+i),
 			"seadex_tags", "best · 1080p · dual-audio", "pass_id", pass,
@@ -126,6 +126,8 @@ func TestDemo(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(dir, "report-20261022T101500Z.md"), []byte("# Report\n"), 0o600); err != nil {
 		t.Fatal(err)
 	}
+	// Vinland Saga's season 2 and Your Name. are unmonitored.
+	store.setMonitored([]string{"sonarr:11:2", "radarr:13"}, "")
 	srv := NewServer(Options{Addr: addr, ReportDir: dir, Store: store, Log: slog.Default()})
 	t.Logf("demo dashboard on http://%s", addr)
 	if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {

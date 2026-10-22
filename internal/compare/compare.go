@@ -153,6 +153,9 @@ type Finding struct {
 	LibraryBytes    int64
 	EntryIncomplete bool
 	NoBestReason    string
+	// ArrID is the item's id in its arr, for the dashboard to look up its
+	// monitored flags. Set in Extended mode only.
+	ArrID int
 }
 
 // --- Comparison flow ---
