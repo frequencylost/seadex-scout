@@ -1,6 +1,7 @@
 package compare
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/cplieger/seadex-scout/internal/library"
@@ -91,5 +92,65 @@ func TestExtendedIncompleteEntryStaysAnUpgrade(t *testing.T) {
 	m := match.Match{Item: sizedSeries(), Arr: library.ArrSonarr, Entry: entry, Record: mapping.Record{SeasonTvdb: 1}}
 	if got := New(Config{}).Compare([]match.Match{m}); len(got) != 1 || got[0].Status != StatusIncomplete {
 		t.Errorf("without Extended = %+v, want upstream's incomplete row", got)
+	}
+}
+
+// namedPack is a non-best pack of group whose episode files are named by name.
+func namedPack(group string, n int, name func(e int) string) seadex.Torrent {
+	t := seadex.Torrent{ReleaseGroup: group, Tracker: "Nyaa", URL: fmt.Sprintf("https://nyaa.si/view/named%d", n), InfoHash: hash(950 + n)}
+	for e := 1; e <= 12; e++ {
+		t.Files = append(t.Files, seadex.File{Name: name(e), Length: gib / 2})
+	}
+	t.Files = append(t.Files, seadex.File{Name: "Extras/[BD Menu 01] Show - Season 01.mkv", Length: gib / 100},
+		seadex.File{Name: "[" + group + "] Show NCOP1 [BD 1080p].mkv", Length: gib / 10})
+	return t
+}
+
+// TestAltSizeChangeReadsOtherEpisodeNames pins the size change of an alt whose
+// files name episodes as "S01.E05" or "Ep05", which the shared parser does not
+// read: the two releases seen on SeaDex were To Your Eternity's SEV and
+// Hanasaku Iroha's Hobiron.
+func TestAltSizeChangeReadsOtherEpisodeNames(t *testing.T) {
+	tests := []struct {
+		name string
+		file func(e int) string
+	}{
+		{"S01.E05", func(e int) string { return fmt.Sprintf("Show - S01.E%02d - Title 1080p BDRip x265 [SEV].mkv", e) }},
+		{"Ep05", func(e int) string { return fmt.Sprintf("[Hobiron] Show Ep%02d [BD 1080p FLAC][FB223FB5].mkv", e) }},
+		{"Episode 05", func(e int) string { return fmt.Sprintf("[Grp] Show Episode %02d [1080p].mkv", e) }},
+	}
+	for i, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			item := heldSeries("subsplease")
+			entry := seadex.Entry{AniListID: 1, Torrents: []seadex.Torrent{pack(1, 12, 1), namedPack("Alt", i, tt.file)}}
+			got := extendedOne(t, item, entry)
+			if len(got) != 1 {
+				t.Fatalf("Compare = %+v, want one row", got)
+			}
+			if a := got[0].Alt; a.Group != "Alt" || a.CurrentBytes != 12*heldBytes {
+				t.Errorf("Alt = %+v, want Alt replacing the whole season (%d)", a, 12*heldBytes)
+			}
+		})
+	}
+}
+
+// TestBareEpisodeNumbersReadPerSeason pins the season-relative retry: a season
+// 2 release numbering its files Ep01.. is not absolute episode 1.
+func TestBareEpisodeNumbersReadPerSeason(t *testing.T) {
+	item := seasonTwoSeries(1, 13)
+	for e := range item.SeasonEpisodes[2] {
+		item.FileBytes[item.SeasonEpisodes[2][e].File] = heldBytes
+	}
+	item.Groups = []string{"subsplease"}
+	item.SeasonGroups = map[int][]string{2: {"subsplease"}}
+	best := seadex.Torrent{IsBest: true, ReleaseGroup: "SubsPlease", Tracker: "Nyaa", URL: "https://nyaa.si/view/s2", InfoHash: hash(3)}
+	for e := 1; e <= 12; e++ {
+		best.Files = append(best.Files, seadex.File{Name: fmt.Sprintf("[SubsPlease] Show - S02E%02d (1080p).mkv", e), Length: newBytes})
+	}
+	alt := namedPack("Alt", 9, func(e int) string { return fmt.Sprintf("[Alt] Show S2 Ep%02d [1080p].mkv", e) })
+	m := match.Match{Item: item, Arr: item.Arr, Entry: seadex.Entry{AniListID: 1, Torrents: []seadex.Torrent{best, alt}}, Record: mapping.Record{SeasonTvdb: 2}}
+	got := New(Config{Extended: true}).Compare([]match.Match{m})
+	if len(got) != 1 || got[0].Alt.CurrentBytes != 12*heldBytes {
+		t.Fatalf("Compare = %+v, want the alt replacing season 2 (%d)", got, 12*heldBytes)
 	}
 }

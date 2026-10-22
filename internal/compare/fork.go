@@ -1,12 +1,16 @@
 package compare
 
 import (
+	"path"
+	"regexp"
 	"slices"
+	"strconv"
 
 	"github.com/cplieger/seadex-scout/internal/align"
 	"github.com/cplieger/seadex-scout/internal/classify"
 	"github.com/cplieger/seadex-scout/internal/library"
 	"github.com/cplieger/seadex-scout/internal/match"
+	"github.com/cplieger/seadex-scout/internal/payload"
 	"github.com/cplieger/seadex-scout/internal/release"
 	"github.com/cplieger/seadex-scout/internal/seadex"
 )
@@ -171,4 +175,60 @@ func libraryBytes(item *library.Item, d *align.Decision) int64 {
 		total = sum
 	}
 	return total
+}
+
+// Episode names payload.Span does not read, for sizing only: "S01.E05" (a
+// separator between season and episode) and a bare "Ep05", "Ep 05" or
+// "Episode 05". The shared parser is left alone because the indexer reads
+// releases with it too.
+var (
+	separatedEpisode = regexp.MustCompile(`(?i)(?:^|[^a-z0-9])S(\d{1,2})[ ._]E(\d{1,4})(?:v\d+)?(?:[^a-z0-9]|$)`)
+	bareEpisode      = regexp.MustCompile(`(?i)(?:^|[^a-z0-9])Ep(?:isode)?[ ._]?(\d{1,4})(?:v\d+)?(?:[^a-z0-9]|$)`)
+)
+
+// episodeSpans is payload.Spans with a fallback for the names above. A bare
+// "Ep05" reads as absolute episode 5, or as episode 5 of season when
+// relative is set.
+func episodeSpans(files []seadex.File, season int, relative bool) ([]payload.EpisodeSpan, bool) {
+	if spans, ok := payload.Spans(files); ok {
+		return spans, true
+	}
+	if len(files) == 0 {
+		return nil, false
+	}
+	spans := make([]payload.EpisodeSpan, 0, len(files))
+	for i := range files {
+		if span, ok := payload.Span(payload.StripExt(path.Base(files[i].Name))); ok {
+			spans = append(spans, span)
+			continue
+		}
+		base := payload.StripExt(path.Base(files[i].Name))
+		if m := lastMatch(separatedEpisode, base); m != nil {
+			s, _ := strconv.Atoi(m[1])
+			e, _ := strconv.Atoi(m[2])
+			spans = append(spans, payload.EpisodeSpan{Season: s, First: e, Last: e})
+			continue
+		}
+		if m := lastMatch(bareEpisode, base); m != nil {
+			e, _ := strconv.Atoi(m[1])
+			s := payload.AbsoluteSeason
+			if relative {
+				s = season
+			}
+			spans = append(spans, payload.EpisodeSpan{Season: s, First: e, Last: e})
+			continue
+		}
+		return nil, false
+	}
+	return spans, true
+}
+
+// lastMatch is the submatches of re's last match in s, or nil: an episode
+// marker follows the title, which may hold a look-alike.
+func lastMatch(re *regexp.Regexp, s string) []string {
+	all := re.FindAllStringSubmatch(s, -1)
+	if len(all) == 0 {
+		return nil
+	}
+	return all[len(all)-1]
 }

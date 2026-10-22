@@ -218,14 +218,25 @@ func replacedBytes(m *match.Match, d *align.Decision, set []candidate) (int64, b
 // files whose every episode is covered. An SxxExx span must name season; an
 // absolute number must be the Absolute of exactly one episode of the series,
 // and that episode must sit in season.
+//
+// A file name the standard reader cannot read falls back to episodeSpans
+// (fork.go), whose bare "Ep05" numbers are tried as absolute first and then
+// as episodes of season.
 func coveredFiles(item *library.Item, season int, set []candidate) ([]int, bool) {
+	if files, ok := coveredFilesAs(item, season, set, false); ok {
+		return files, true
+	}
+	return coveredFilesAs(item, season, set, true)
+}
+
+func coveredFilesAs(item *library.Item, season int, set []candidate, relative bool) ([]int, bool) {
 	episodes := item.SeasonEpisodes[season]
 	if episodes == nil {
 		return nil, false
 	}
 	cover := seasonCover{item: item, season: season, episodes: episodes, covered: map[[2]int]bool{}, touched: map[int]bool{}}
 	for i := range set {
-		spans, ok := payload.Spans(payload.Census(set[i].torrent.Files))
+		spans, ok := episodeSpans(payload.Census(set[i].torrent.Files), season, relative)
 		if !ok {
 			return nil, false
 		}
