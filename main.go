@@ -94,6 +94,9 @@ func main() {
 		slog.Error("invalid invocation", "error", err)
 		os.Exit(2)
 	}
+	if mode == config.RunModeDaemon {
+		activeWebUI = installWebUI(boot.path)
+	}
 	logConfig(cfg, mode)
 
 	if err := dispatch(mode, &boot); err != nil {
@@ -384,6 +387,13 @@ func run(cfg *config.Config) error {
 	marker := health.NewMarker(health.DefaultPath)
 	marker.Set(false)
 	defer marker.Cleanup()
+
+	// Started before the scout is built, so the dashboard is reachable (showing
+	// its saved state) during a slow first start.
+	if activeWebUI != nil {
+		stopWebUI := activeWebUI.start(ctx, cfg)
+		defer stopWebUI()
+	}
 
 	// Built BEFORE the scout because the compare cycle publishes each completed
 	// snapshot straight into it, which keeps the snapshot file off the serving path.

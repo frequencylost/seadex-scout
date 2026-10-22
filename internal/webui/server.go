@@ -1,0 +1,160 @@
+package webui
+
+import (
+	"crypto/sha256"
+	"crypto/subtle"
+	"embed"
+	"encoding/json"
+	"errors"
+	"io"
+	"io/fs"
+	"log/slog"
+	"net/http"
+	"path/filepath"
+	"time"
+)
+
+//go:embed static
+var staticFS embed.FS
+
+// csrfHeader must be present on every state-changing request. A browser sends
+// a custom header cross-origin only after a CORS preflight, which this server
+// never approves, so another site cannot trigger a report run.
+const csrfHeader = "X-Seadex-Scout"
+
+// Options configures the dashboard server.
+type Options struct {
+	Addr      string
+	Username  string
+	Password  string // empty turns authentication off
+	ReportDir string
+	Store     *Store
+	Runner    *ReportRunner
+	Log       *slog.Logger
+}
+
+// NewServer returns the dashboard's HTTP server, not yet listening.
+func NewServer(o Options) *http.Server {
+	static, err := fs.Sub(staticFS, "static")
+	if err != nil {
+		panic(err) // the embed directive guarantees the directory
+	}
+	mux := http.NewServeMux()
+	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+		_, _ = io.WriteString(w, "ok\n")
+	})
+
+	app := http.NewServeMux()
+	app.Handle("GET /", http.FileServerFS(static))
+	app.HandleFunc("GET /api/state", func(w http.ResponseWriter, _ *http.Request) {
+		writeJSON(w, o.Store.Snapshot())
+	})
+	app.HandleFunc("GET /api/logs", func(w http.ResponseWriter, _ *http.Request) {
+		writeJSON(w, o.Store.Logs())
+	})
+	app.HandleFunc("GET /api/reports", func(w http.ResponseWriter, _ *http.Request) {
+		list, err := ListReports(o.ReportDir)
+		if err != nil {
+			o.Log.Warn("dashboard could not list reports", "error", err)
+			http.Error(w, "could not read the report folder", http.StatusInternalServerError)
+			return
+		}
+		writeJSON(w, map[string]any{"reports": list, "job": o.Store.reportJob()})
+	})
+	app.HandleFunc("GET /api/reports/{name}", func(w http.ResponseWriter, r *http.Request) {
+		name := r.PathValue("name")
+		f, err := OpenReport(o.ReportDir, name)
+		if err != nil {
+			http.NotFound(w, r)
+			return
+		}
+		defer f.Close()
+		info, err := f.Stat()
+		if err != nil {
+			http.NotFound(w, r)
+			return
+		}
+		if filepath.Ext(name) == ".md" {
+			w.Header().Set("Content-Type", "text/markdown; charset=utf-8")
+		} else {
+			w.Header().Set("Content-Type", "application/json")
+		}
+		if r.URL.Query().Has("download") {
+			w.Header().Set("Content-Disposition", `attachment; filename="`+name+`"`)
+		}
+		http.ServeContent(w, r, "", info.ModTime(), f)
+	})
+	app.HandleFunc("POST /api/reports/run", func(w http.ResponseWriter, r *http.Request) {
+		if r.Header.Get(csrfHeader) == "" {
+			http.Error(w, "missing "+csrfHeader+" header", http.StatusForbidden)
+			return
+		}
+		if o.Runner == nil {
+			http.Error(w, "reports cannot be started from here", http.StatusNotImplemented)
+			return
+		}
+		switch err := o.Runner.Start(); {
+		case errors.Is(err, ErrReportRunning):
+			http.Error(w, err.Error(), http.StatusConflict)
+			return
+		case err != nil:
+			o.Log.Warn("dashboard could not start a report", "error", err)
+			http.Error(w, "could not start the report", http.StatusInternalServerError)
+			return
+		}
+		o.Log.Info("report started from the dashboard")
+		w.WriteHeader(http.StatusAccepted)
+		writeJSON(w, o.Store.reportJob())
+	})
+	mux.Handle("/", basicAuth(o.Username, o.Password, app))
+
+	return &http.Server{
+		Addr:              o.Addr,
+		Handler:           securityHeaders(mux),
+		ReadHeaderTimeout: 10 * time.Second,
+		ReadTimeout:       30 * time.Second,
+		WriteTimeout:      2 * time.Minute,
+		IdleTimeout:       2 * time.Minute,
+	}
+}
+
+func writeJSON(w http.ResponseWriter, v any) {
+	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Cache-Control", "no-store")
+	enc := json.NewEncoder(w)
+	_ = enc.Encode(v)
+}
+
+func securityHeaders(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		h := w.Header()
+		h.Set("Content-Security-Policy", "default-src 'self'; img-src 'self' data:; style-src 'self'; script-src 'self'; connect-src 'self'; frame-ancestors 'self'; base-uri 'none'; form-action 'none'")
+		h.Set("X-Content-Type-Options", "nosniff")
+		h.Set("Referrer-Policy", "no-referrer")
+		next.ServeHTTP(w, r)
+	})
+}
+
+// basicAuth guards next with HTTP Basic auth when password is set. Both values
+// are compared as hashes in constant time, so their length leaks nothing.
+func basicAuth(username, password string, next http.Handler) http.Handler {
+	if password == "" {
+		return next
+	}
+	wantUser := sha256.Sum256([]byte(username))
+	wantPass := sha256.Sum256([]byte(password))
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		u, p, ok := r.BasicAuth()
+		gotUser := sha256.Sum256([]byte(u))
+		gotPass := sha256.Sum256([]byte(p))
+		userOK := subtle.ConstantTimeCompare(gotUser[:], wantUser[:])
+		passOK := subtle.ConstantTimeCompare(gotPass[:], wantPass[:])
+		if !ok || userOK&passOK != 1 {
+			w.Header().Set("WWW-Authenticate", `Basic realm="seadex-scout", charset="UTF-8"`)
+			http.Error(w, "unauthorized", http.StatusUnauthorized)
+			return
+		}
+		next.ServeHTTP(w, r)
+	})
+}

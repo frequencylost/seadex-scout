@@ -1,0 +1,220 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SeaDex Scout</title>
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="app.css">
+<script src="app.js" defer></script>
+</head>
+<body>
+<header class="topbar">
+  <div class="brand">
+    <img src="favicon.svg" alt="" width="28" height="28">
+    <div>
+      <h1>SeaDex Scout</h1>
+      <p id="subtitle" class="muted">Loading…</p>
+    </div>
+  </div>
+  <div class="topbar-right">
+    <span id="status-pill" class="pill">…</span>
+    <button id="theme-toggle" class="icon-btn" type="button" title="Toggle light or dark theme" aria-label="Toggle theme">◐</button>
+  </div>
+</header>
+
+<nav class="tabs" role="tablist">
+  <button role="tab" data-tab="overview" aria-selected="true">Overview</button>
+  <button role="tab" data-tab="activity">Activity</button>
+  <button role="tab" data-tab="health">Scout health</button>
+  <button role="tab" data-tab="reports">Reports</button>
+  <button role="tab" data-tab="log">Log</button>
+</nav>
+
+<main>
+  <!-- Overview -->
+  <section id="tab-overview" class="tab-panel">
+    <div id="attention" class="attention" hidden></div>
+
+    <div class="kpis">
+      <div class="kpi"><span class="kpi-label">Upgrades</span><span id="kpi-upgrades" class="kpi-value">–</span><span id="kpi-upgrades-sub" class="kpi-sub"></span></div>
+      <div class="kpi"><span class="kpi-label">To check by hand</span><span id="kpi-checks" class="kpi-value">–</span><span class="kpi-sub">mixed or untagged groups</span></div>
+      <div class="kpi"><span class="kpi-label">Anime at SeaDex best or alt</span><span id="kpi-bestalt" class="kpi-value">–</span><span id="kpi-bestalt-sub" class="kpi-sub"></span></div>
+      <div class="kpi"><span class="kpi-label">Last check</span><span id="kpi-lastcheck" class="kpi-value">–</span><span id="kpi-lastcheck-sub" class="kpi-sub"></span></div>
+    </div>
+
+    <div class="card">
+      <div class="card-head">
+        <h2>Library overview</h2>
+        <span id="library-asof" class="muted small"></span>
+      </div>
+      <div id="library" class="bars"><p class="empty">Shown after the first daily full check.</p></div>
+    </div>
+
+    <div class="card">
+      <div class="card-head">
+        <h2>Upgrades available <span id="upgrades-count" class="count"></span></h2>
+        <div class="controls">
+          <input id="upgrades-search" type="search" placeholder="Filter by title or group" aria-label="Filter upgrades">
+          <select id="upgrades-arr" aria-label="App"><option value="">Sonarr and Radarr</option><option value="sonarr">Sonarr</option><option value="radarr">Radarr</option></select>
+          <label class="toggle"><input id="upgrades-optional" type="checkbox"> Show optional upgrades</label>
+        </div>
+      </div>
+      <p class="muted small">Optional upgrades are ones where you already have a SeaDex alt. Newer versions of your group come first, then by size change.</p>
+      <div class="table-wrap">
+        <table id="upgrades" class="data">
+          <thead><tr>
+            <th data-sort="title">Title</th><th data-sort="why">Why</th><th data-sort="current">You have</th><th data-sort="best">SeaDex best</th><th>SeaDex alt</th><th data-sort="size" class="num">Size</th><th data-sort="change" class="num">Size change</th><th>Get it</th><th data-sort="first" class="num">First seen</th>
+          </tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-head"><h2>Check by hand <span id="checks-count" class="count"></span></h2></div>
+      <p class="muted small">Seasons whose files span several release groups, or whose group could not be read, so the scout cannot say which release you have.</p>
+      <div class="table-wrap">
+        <table id="checks" class="data">
+          <thead><tr><th>Title</th><th>Reason</th><th>You have</th><th>SeaDex best</th><th>SeaDex alt</th><th class="num">First seen</th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </div>
+
+    <details class="card">
+      <summary><h2>Informational <span id="info-count" class="count"></span></h2></summary>
+      <p class="muted small">SeaDex entries that are incomplete or list a theoretical best only. Nothing to do.</p>
+      <div class="table-wrap">
+        <table id="infos" class="data">
+          <thead><tr><th>Title</th><th>Status</th><th>You have</th><th>SeaDex best</th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </details>
+  </section>
+
+  <!-- Activity -->
+  <section id="tab-activity" class="tab-panel" hidden>
+    <div class="card">
+      <div class="card-head"><h2>Upgrade activity</h2><span class="muted small">Upgrades entering and leaving the list</span></div>
+      <div class="table-wrap">
+        <table id="events" class="data">
+          <thead><tr><th>When</th><th>Event</th><th>Title</th><th>You have</th><th>SeaDex best</th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <!-- Health -->
+  <section id="tab-health" class="tab-panel" hidden>
+    <div class="kpis">
+      <div class="kpi"><span class="kpi-label">Running since</span><span id="h-started" class="kpi-value small-value">–</span><span id="h-started-sub" class="kpi-sub"></span></div>
+      <div class="kpi"><span class="kpi-label">Last full check</span><span id="h-full" class="kpi-value small-value">–</span><span id="h-full-sub" class="kpi-sub"></span></div>
+      <div class="kpi"><span class="kpi-label">Errors in 7 days</span><span id="h-errors" class="kpi-value">–</span><span class="kpi-sub">without a lasting condition</span></div>
+      <div class="kpi"><span class="kpi-label">Torznab requests</span><span id="h-indexer" class="kpi-value">–</span><span id="h-indexer-sub" class="kpi-sub"></span></div>
+    </div>
+
+    <div class="grid2">
+      <div class="card">
+        <div class="card-head"><h2>Lasting problems</h2></div>
+        <div id="conditions"></div>
+      </div>
+      <div class="card">
+        <div class="card-head"><h2>Configuration</h2></div>
+        <dl id="config" class="kv"></dl>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-head"><h2>Full check duration</h2><span class="muted small">Last 60 full checks</span></div>
+      <div id="cycles-chart" class="chart"></div>
+    </div>
+
+    <div class="card">
+      <div class="card-head"><h2>Errors logged</h2></div>
+      <div class="table-wrap">
+        <table id="errors" class="data">
+          <thead><tr><th>When</th><th>Message</th><th>Detail</th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-head"><h2>Degraded checks</h2></div>
+      <div class="table-wrap">
+        <table id="degraded" class="data">
+          <thead><tr><th>When</th><th>Check</th><th>Reason</th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-head"><h2>Torznab feed</h2></div>
+      <dl id="indexer" class="kv"></dl>
+    </div>
+  </section>
+
+  <!-- Reports -->
+  <section id="tab-reports" class="tab-panel" hidden>
+    <div class="card">
+      <div class="card-head">
+        <h2>Reports</h2>
+        <div class="controls">
+          <span id="report-job" class="muted small"></span>
+          <button id="report-run" type="button" class="primary">Run a report now</button>
+        </div>
+      </div>
+      <p class="muted small">A report compares every season, film and special you have with SeaDex. It reads your whole library and can take 25 minutes or more.</p>
+      <div class="table-wrap">
+        <table id="reports" class="data">
+          <thead><tr><th>Report</th><th>Written</th><th class="num">Size</th><th></th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div id="report-view" class="card" hidden>
+      <div class="card-head">
+        <h2 id="report-title">Report</h2>
+        <div class="controls">
+          <input id="report-search" type="search" placeholder="Filter by title or group" aria-label="Filter report rows">
+          <select id="report-verdict" aria-label="Verdict"><option value="">Every verdict</option></select>
+        </div>
+      </div>
+      <div id="report-totals" class="chips"></div>
+      <div class="table-wrap">
+        <table id="report-rows" class="data">
+          <thead><tr><th>Title</th><th>App</th><th>Season</th><th>Verdict</th><th>You have</th><th>SeaDex releases</th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+      <p id="report-more" class="muted small"></p>
+    </div>
+  </section>
+
+  <!-- Log -->
+  <section id="tab-log" class="tab-panel" hidden>
+    <div class="card">
+      <div class="card-head">
+        <h2>Recent log</h2>
+        <div class="controls">
+          <select id="log-level" aria-label="Lowest level"><option value="INFO">Info and above</option><option value="WARN">Warnings and errors</option><option value="ERROR">Errors only</option></select>
+          <input id="log-search" type="search" placeholder="Filter" aria-label="Filter log">
+        </div>
+      </div>
+      <p class="muted small">The newest 500 lines, without per-finding and Torznab request lines. <code>docker logs seadex-scout</code> has everything.</p>
+      <div id="log" class="log"></div>
+    </div>
+  </section>
+</main>
+
+<footer class="muted small">
+  <span id="footer-text"></span>
+  · <a href="https://seadex.moe" target="_blank" rel="noopener">SeaDex</a>
+</footer>
+</body>
+</html>

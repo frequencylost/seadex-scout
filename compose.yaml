@@ -1,7 +1,7 @@
 # Example compose for seadex-scout. See the README for all configuration options and hardening.
 services:
   seadex-scout:
-    image: ghcr.io/cplieger/seadex-scout:latest
+    image: ghcr.io/frequencylost/seadex-scout:latest
     container_name: seadex-scout
     restart: unless-stopped
     # Create ./config and run "sudo chown 1000:1000 config" before the first start,
@@ -15,5 +15,8 @@ services:
       - SEADEX_SCOUT_FEED_KEY  # these three are for the optional indexer, see docs/torznab-indexer.md
       - SEADEX_SCOUT_PROWLARR_KEY
       - SEADEX_SCOUT_AB_PASSKEY
+      - SEADEX_SCOUT_WEBUI_PASSWORD  # optional, set it to require a sign-in for the dashboard (user admin)
+    ports:
+      - "9119:9119"  # the built-in dashboard, open http://<host>:9119
     volumes:
       - "./config:/config"  # config.yaml, saved state and the reports folder

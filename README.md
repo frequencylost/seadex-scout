@@ -1,4 +1,10 @@
-# seadex-scout
+# seadex-scout (with a built-in dashboard)
+
+> **This is a fork of [cplieger/seadex-scout](https://github.com/cplieger/seadex-scout)** that adds a web dashboard to the container itself, on port `9119`.
+> The original shows its results through Grafana, Loki and Alertmanager. This fork needs none of them: open `http://<server>:9119` and you get the upgrades, the library overview, the scout's health and the reports.
+> Everything else, including the config file, the log format and the optional indexer, works as upstream. The Grafana dashboard and the Loki rules still work if you want them.
+> See [The built-in dashboard](docs/dashboard.md) and [Installing on Unraid](#installing-on-unraid).
+
 
 [![Image Size](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/cplieger/seadex-scout/badges/size.json)](https://github.com/cplieger/seadex-scout/pkgs/container/seadex-scout) [![Platforms](https://img.shields.io/badge/platforms-amd64%20%7C%20arm64-blue)](https://github.com/cplieger/seadex-scout/pkgs/container/seadex-scout) [![base: Distroless](https://img.shields.io/badge/base-Distroless_nonroot-4285F4?logo=google)](https://github.com/cplieger/seadex-scout/blob/main/Dockerfile) [![Mutation](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/cplieger/seadex-scout/badges/mutation.json)](https://github.com/cplieger/seadex-scout/issues?q=label%3Agremlins-tracker) [![SBOM](https://img.shields.io/badge/SBOM-SPDX-1D4ED8)](https://github.com/cplieger/seadex-scout/releases)
 
@@ -66,7 +72,22 @@ services:
 
 Run `docker logs seadex-scout`. You should see `sonarr reachable`. Findings then appear as `better release available` lines. If you see `sonarr ping failed at startup`, the address is wrong or Sonarr is down.
 
-On Unraid, open the **Apps** tab, search for seadex-scout and click **Install**. Enter your Sonarr URL and API key, then start it.
+Open `http://<host>:9119` for the dashboard. It fills in after the first full check, which can take 25 minutes or more on a first start.
+
+## Installing on Unraid
+
+This fork is not in Community Applications. Add it from its template:
+
+1. Open a terminal on the Unraid server (the `>_` icon at the top right) and run
+
+   ```sh
+   wget -O /boot/config/plugins/dockerMan/templates-user/my-seadex-scout.xml https://raw.githubusercontent.com/FrequencyLost/seadex-scout/main/unraid/seadex-scout.xml
+   ```
+
+   Then, on the **Docker** tab, click **Add Container** and pick **seadex-scout** from the **Template** list, under **User templates**.
+2. Enter your Sonarr URL and API key (and Radarr's, if you use it), and optionally a dashboard password.
+3. Click **Apply**. The template runs the container as `99:100` (nobody:users), so `/mnt/user/appdata/seadex-scout` needs no `chown`.
+4. Click the container's icon and choose **WebUI** to open the dashboard.
 
 ## Reading the results
 
@@ -131,11 +152,19 @@ The settings most people change:
 
 | Port | Description |
 | --- | --- |
+| `9119` | The built-in dashboard. Change it with `SEADEX_SCOUT_WEBUI_PORT`, or set that to `off`. |
 | `9118` | The optional indexer. Bound only when a Torznab URL is set. |
+
+| Dashboard variable | Description | Default |
+| --- | --- | --- |
+| `SEADEX_SCOUT_WEBUI_PORT` | Port the dashboard listens on. `off` turns it off. | `9119` |
+| `SEADEX_SCOUT_WEBUI_BIND` | Address to listen on. Empty means every interface. | _(empty)_ |
+| `SEADEX_SCOUT_WEBUI_PASSWORD` | Set it to require HTTP Basic sign-in. Empty leaves the dashboard open. | _(unset)_ |
+| `SEADEX_SCOUT_WEBUI_USERNAME` | User name for the sign-in. | `admin` |
 
 ## Security
 
-seadex-scout opens no port until you set up the indexer. The indexer then answers only requests that carry its `feed_api_key`, and refuses the rest with `401`.
+The dashboard listens on port `9119` and has no sign-in unless you set `SEADEX_SCOUT_WEBUI_PASSWORD`. Keep it on your local network: it links to your Sonarr and Radarr and can start a report run. Apart from the dashboard, seadex-scout opens no port until you set up the indexer. The indexer then answers only requests that carry its `feed_api_key`, and refuses the rest with `401`.
 
 Keep the indexer on your local network, because the AnimeBytes RSS links it serves contain your AnimeBytes passkey. If you write the passkey into `config.yaml` itself rather than `.env`, a backup of `config` carries it too.
 
