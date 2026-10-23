@@ -586,7 +586,7 @@ function linkCell(a, links, nyaaURL) {
   const td = el("td", {}, el("div", { class: "links" }, links));
   if (qbit && qbit.enabled && nyaaURL && (a.arr === "sonarr" || a.arr === "radarr")) {
     const category = (qbit.categories || {})[a.arr];
-    const btn = el("button", { type: "button", class: "qbit-btn", title: `Add this Nyaa release to qBittorrent${category ? ` under the category ${category}` : ""}` }, "→ qBittorrent");
+    const btn = el("button", { type: "button", class: "qbit-btn", title: `Add this Nyaa release to qBittorrent${category ? ` under the category ${category}` : ""}` }, "→ qBit");
     if (state.qbitSent.has(nyaaURL)) {
       btn.textContent = "Added ✓";
       btn.classList.add("done");
@@ -713,6 +713,7 @@ function renderHealth(snap) {
 
   renderCycles(snap.cycles || []);
   renderNotify(snap.notify || {}, now);
+  renderQbit(snap.qbit || {});
 
   setRows($("errors").tBodies[0], (snap.errors || []).slice().reverse().map((e) => {
     const detail = Object.entries(e.attrs || {}).map(([k, v]) => `${k}=${typeof v === "string" ? v : JSON.stringify(v)}`).join("  ");
@@ -795,6 +796,33 @@ function renderNotify(n, now) {
     ["Status", "Off. Set SEADEX_SCOUT_NTFY_URL to an ntfy topic, such as https://ntfy.sh/your-topic, to get a message for each new upgrade."],
   ];
   $("notify").replaceChildren(...rows.flatMap(([k, v]) => [el("dt", { text: k }), el("dd", { text: v })]));
+}
+
+function renderQbit(q) {
+  $("qbit-test").disabled = !q.enabled;
+  const cats = q.categories || {};
+  const rows = q.enabled ? [
+    ["Status", "On: Nyaa links have a → qBit button"],
+    ["Sonarr category", cats.sonarr || "none"],
+    ["Radarr category", cats.radarr || "none"],
+  ] : [["Status", "Off. Set SEADEX_SCOUT_QBIT_URL to qBittorrent's Web UI address to add a → qBit button under each Nyaa link."]];
+  $("qbit").replaceChildren(...rows.flatMap(([k, v]) => [el("dt", { text: k }), el("dd", { text: v })]));
+}
+
+async function testQbit() {
+  const btn = $("qbit-test");
+  const out = $("qbit-test-result");
+  btn.disabled = true;
+  out.textContent = "Connecting…";
+  try {
+    const res = await fetch("api/qbit/test", { method: "POST", headers: { "X-Seadex-Scout": "1" } });
+    if (!res.ok) throw new Error((await res.text()).trim());
+    const v = await res.json();
+    out.textContent = `Connected to qBittorrent ${v.version}`;
+  } catch (err) {
+    out.textContent = "Failed: " + err.message;
+  }
+  btn.disabled = false;
 }
 
 async function sendTestNotification() {
@@ -953,6 +981,7 @@ function init() {
   }
   $("report-run").addEventListener("click", runReport);
   $("notify-test").addEventListener("click", sendTestNotification);
+  $("qbit-test").addEventListener("click", testQbit);
   $("report-search").addEventListener("input", renderReport);
   $("report-verdict").addEventListener("input", renderReport);
   $("log-level").addEventListener("input", loadLogs);

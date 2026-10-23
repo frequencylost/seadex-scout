@@ -186,6 +186,7 @@ details.card[open] > summary h2::before { content: "▾ "; }
   text-align: center;
 }
 
+#qbit-test-result, #notify-test-result { max-width: 640px; }
 .controls { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
 input[type="search"], select {
   font: inherit;

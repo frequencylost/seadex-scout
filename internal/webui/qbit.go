@@ -35,7 +35,8 @@ type QbitStatus struct {
 // session is missing or expired.
 type Qbit struct {
 	cfg    QbitConfig
-	base   string
+	base   string // the Web UI address, with any base path
+	origin string // scheme://host[:port], what qBittorrent's CSRF check compares
 	client *http.Client
 
 	mu sync.Mutex // serializes sign-in and add, so a retry sees one session
@@ -51,6 +52,7 @@ func NewQbit(cfg QbitConfig) (*Qbit, error) {
 	return &Qbit{
 		cfg:    cfg,
 		base:   strings.TrimRight(u.Scheme+"://"+u.Host+u.Path, "/"),
+		origin: u.Scheme + "://" + u.Host,
 		client: &http.Client{Timeout: 30 * time.Second, Jar: jar},
 	}, nil
 }
@@ -74,8 +76,8 @@ func NyaaTorrentURL(view string) (string, bool) {
 	return "https://nyaa.si/download/" + m[1] + ".torrent", true
 }
 
-// errQbitAuth means qBittorrent wants a sign-in, or refused the one given.
-var errQbitAuth = errors.New("qBittorrent refused the sign-in: check the user name and password, or allow the container's address in qBittorrent's Web UI settings")
+// errQbitAuth means qBittorrent answered as if no session were signed in.
+var errQbitAuth = errors.New("qBittorrent wants a sign-in")
 
 // AddNyaa adds the release at a Nyaa page under arr's category.
 func (q *Qbit) AddNyaa(ctx context.Context, view, arr string) (string, error) {
@@ -91,24 +93,64 @@ func (q *Qbit) AddNyaa(ctx context.Context, view, arr string) (string, error) {
 	q.mu.Lock()
 	defer q.mu.Unlock()
 	err := q.add(ctx, torrent, category)
-	if errors.Is(err, errQbitAuth) && q.cfg.Username != "" {
-		if err = q.login(ctx); err == nil {
+	if errors.Is(err, errQbitAuth) {
+		if err = q.signIn(ctx); err == nil {
 			err = q.add(ctx, torrent, category)
 		}
 	}
 	return category, err
 }
 
+// Check signs in when needed and returns qBittorrent's version, for the
+// dashboard's Test connection button.
+func (q *Qbit) Check(ctx context.Context) (string, error) {
+	q.mu.Lock()
+	defer q.mu.Unlock()
+	version, err := q.version(ctx)
+	if errors.Is(err, errQbitAuth) {
+		if err = q.signIn(ctx); err == nil {
+			version, err = q.version(ctx)
+		}
+	}
+	return version, err
+}
+
+func (q *Qbit) version(ctx context.Context) (string, error) {
+	status, body, err := q.do(ctx, http.MethodGet, "/api/v2/app/version", nil)
+	switch {
+	case err != nil:
+		return "", err
+	case status == http.StatusForbidden || status == http.StatusUnauthorized:
+		return "", errQbitAuth
+	case status != http.StatusOK:
+		return "", answerError("the version check", status, body)
+	}
+	return body, nil
+}
+
+// signIn signs in, or explains why it could not.
+func (q *Qbit) signIn(ctx context.Context) error {
+	if q.cfg.Username == "" {
+		return errors.New("qBittorrent wants a sign-in: set the qBittorrent user name and password, " +
+			"or tick \"Bypass authentication for clients in whitelisted IP subnets\" in its Web UI settings and add your LAN")
+	}
+	return q.login(ctx)
+}
+
 func (q *Qbit) add(ctx context.Context, torrent, category string) error {
 	if category != "" {
 		// Ensure the category exists: qBittorrent answers 409 when it already
 		// does, which is fine, and adding under a missing one fails.
-		status, _, err := q.post(ctx, "/api/v2/torrents/createCategory", url.Values{"category": {category}})
-		if err != nil {
+		status, body, err := q.post(ctx, "/api/v2/torrents/createCategory", url.Values{"category": {category}})
+		switch {
+		case err != nil:
 			return err
-		}
-		if status == http.StatusForbidden {
+		case status == http.StatusForbidden || status == http.StatusUnauthorized:
 			return errQbitAuth
+		case status == http.StatusBadRequest:
+			return fmt.Errorf("qBittorrent refused the category %q as a name", category)
+		case status/100 != 2 && status != http.StatusConflict:
+			return answerError("creating the category", status, body)
 		}
 	}
 	form := url.Values{"urls": {torrent}}
@@ -119,16 +161,18 @@ func (q *Qbit) add(ctx context.Context, torrent, category string) error {
 	switch {
 	case err != nil:
 		return err
-	case status == http.StatusForbidden:
+	case status == http.StatusForbidden || status == http.StatusUnauthorized:
 		return errQbitAuth
-	case status != http.StatusOK:
-		return fmt.Errorf("qBittorrent answered %d: %s", status, body)
-	case strings.HasPrefix(body, "Fails"):
+	case status == http.StatusUnsupportedMediaType || strings.HasPrefix(body, "Fails"):
 		return errors.New("qBittorrent could not add the torrent; it may already be in the list")
+	case status/100 != 2:
+		return answerError("the add", status, body)
 	}
 	return nil
 }
 
+// login signs in. qBittorrent 4 answers 200 "Ok." or "Fails."; qBittorrent 5
+// can answer 204 with no body, so success is anything 2xx that is not "Fails".
 func (q *Qbit) login(ctx context.Context) error {
 	status, body, err := q.post(ctx, "/api/v2/auth/login", url.Values{"username": {q.cfg.Username}, "password": {q.cfg.Password}})
 	switch {
@@ -136,22 +180,50 @@ func (q *Qbit) login(ctx context.Context) error {
 		return err
 	case status == http.StatusForbidden:
 		return errors.New("qBittorrent has banned this address after too many failed sign-ins; wait, or restart qBittorrent")
-	case status != http.StatusOK || !strings.HasPrefix(body, "Ok"):
-		return errQbitAuth
+	case status == http.StatusUnauthorized:
+		return errors.New("qBittorrent answered 401 to the sign-in, which is its security check rather than the password: " +
+			"in its Web UI settings, untick \"Enable Host header validation\" or add this address to \"Server domains\", " +
+			"or untick \"Enable Cross-Site Request Forgery (CSRF) protection\"" + bodyNote(body))
+	case status/100 == 2 && strings.HasPrefix(body, "Fails"):
+		return errors.New("qBittorrent refused the user name or password")
+	case status/100 != 2:
+		return answerError("the sign-in", status, body)
 	}
 	return nil
 }
 
-// post sends a form and returns the status and a short body. The Referer and
-// Origin name qBittorrent itself, which its CSRF check requires.
+func answerError(what string, status int, body string) error {
+	return fmt.Errorf("qBittorrent answered %d to %s%s", status, what, bodyNote(body))
+}
+
+func bodyNote(body string) string {
+	if body == "" {
+		return ""
+	}
+	return ` ("` + body + `")`
+}
+
 func (q *Qbit) post(ctx context.Context, path string, form url.Values) (int, string, error) {
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, q.base+path, strings.NewReader(form.Encode()))
+	return q.do(ctx, http.MethodPost, path, form)
+}
+
+// do sends a request, a form when form is set, and returns the status and a
+// short body. The Referer and Origin name qBittorrent itself, which its CSRF
+// check requires.
+func (q *Qbit) do(ctx context.Context, method, path string, form url.Values) (int, string, error) {
+	var body io.Reader
+	if form != nil {
+		body = strings.NewReader(form.Encode())
+	}
+	req, err := http.NewRequestWithContext(ctx, method, q.base+path, body)
 	if err != nil {
 		return 0, "", errors.New("the qBittorrent URL is not valid")
 	}
-	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	if form != nil {
+		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	}
 	req.Header.Set("Referer", q.base+"/")
-	req.Header.Set("Origin", q.base)
+	req.Header.Set("Origin", q.origin)
 	res, err := q.client.Do(req)
 	if err != nil {
 		var uerr interface{ Unwrap() error }
@@ -161,6 +233,6 @@ func (q *Qbit) post(ctx context.Context, path string, form url.Values) (int, str
 		return 0, "", fmt.Errorf("could not reach qBittorrent: %w", err)
 	}
 	defer res.Body.Close()
-	body, _ := io.ReadAll(io.LimitReader(res.Body, 512))
-	return res.StatusCode, strings.TrimSpace(string(body)), nil
+	answer, _ := io.ReadAll(io.LimitReader(res.Body, 512))
+	return res.StatusCode, strings.TrimSpace(string(answer)), nil
 }

@@ -18,6 +18,8 @@ type fakeQbit struct {
 	categories map[string]bool
 	logins     int
 	fail       bool
+	v5         bool // answer like qBittorrent 5: 204 to a sign-in
+	csrf401    bool // answer 401 to everything, as a failed Host or CSRF check does
 	srv        *httptest.Server
 }
 
@@ -27,7 +29,19 @@ func newFakeQbit(t *testing.T) *fakeQbit {
 	f.srv = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		f.mu.Lock()
 		defer f.mu.Unlock()
-		if r.Header.Get("Referer") == "" || r.Method != http.MethodPost || r.ParseForm() != nil {
+		if f.csrf401 || r.Header.Get("Referer") == "" || r.Header.Get("Origin") != f.srv.URL {
+			http.Error(w, "Unauthorized", http.StatusUnauthorized)
+			return
+		}
+		if r.URL.Path == "/api/v2/app/version" {
+			if c, err := r.Cookie("SID"); err != nil || c.Value != "s" {
+				http.Error(w, "Forbidden", http.StatusForbidden)
+				return
+			}
+			_, _ = w.Write([]byte("v5.0.2"))
+			return
+		}
+		if r.Method != http.MethodPost || r.ParseForm() != nil {
 			http.Error(w, "Forbidden", http.StatusForbidden)
 			return
 		}
@@ -38,6 +52,10 @@ func newFakeQbit(t *testing.T) *fakeQbit {
 			}
 			f.logins++
 			http.SetCookie(w, &http.Cookie{Name: "SID", Value: "s", Path: "/"})
+			if f.v5 {
+				w.WriteHeader(http.StatusNoContent)
+				return
+			}
 			_, _ = w.Write([]byte("Ok."))
 			return
 		}
@@ -119,7 +137,7 @@ func TestQbitRefusesOtherAddresses(t *testing.T) {
 
 func TestQbitReportsFailures(t *testing.T) {
 	f := newFakeQbit(t)
-	if _, err := testQbit(t, f, "wrong").AddNyaa(context.Background(), "https://nyaa.si/view/1", "sonarr"); err == nil || !strings.Contains(err.Error(), "sign-in") {
+	if _, err := testQbit(t, f, "wrong").AddNyaa(context.Background(), "https://nyaa.si/view/1", "sonarr"); err == nil || !strings.Contains(err.Error(), "user name or password") {
 		t.Errorf("wrong password: %v", err)
 	}
 	f.fail = true
@@ -164,5 +182,31 @@ func TestQbitEndpoint(t *testing.T) {
 	res.Body.Close()
 	if !strings.Contains(buf.String(), `"qbit":{"enabled":true,"categories":{"radarr":"radarr","sonarr":"tv-sonarr"}}`) || strings.Contains(buf.String(), "pw") {
 		t.Errorf("state = %s", buf.String())
+	}
+}
+
+func TestQbitVersion5AndCheck(t *testing.T) {
+	f := newFakeQbit(t)
+	f.v5 = true
+	q := testQbit(t, f, "pw")
+	if v, err := q.Check(context.Background()); err != nil || v != "v5.0.2" {
+		t.Fatalf("Check = %q, %v", v, err)
+	}
+	if _, err := q.AddNyaa(context.Background(), "https://nyaa.si/view/9", "sonarr"); err != nil {
+		t.Fatalf("add on qBittorrent 5: %v", err)
+	}
+}
+
+func TestQbitExplainsSecurityChecks(t *testing.T) {
+	f := newFakeQbit(t)
+	f.csrf401 = true
+	_, err := testQbit(t, f, "pw").Check(context.Background())
+	if err == nil || !strings.Contains(err.Error(), "Host header validation") {
+		t.Fatalf("a 401: %v", err)
+	}
+	q, _ := NewQbit(QbitConfig{URL: f.srv.URL})
+	f.csrf401 = false
+	if _, err := q.Check(context.Background()); err == nil || !strings.Contains(err.Error(), "Bypass authentication") {
+		t.Fatalf("no user name: %v", err)
 	}
 }

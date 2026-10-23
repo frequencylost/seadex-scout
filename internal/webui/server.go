@@ -148,6 +148,22 @@ func NewServer(o Options) *http.Server {
 		o.Log.Info("release sent to qBittorrent", "url", in.URL, "category", category)
 		writeJSON(w, map[string]string{"category": category})
 	})
+	app.HandleFunc("POST /api/qbit/test", func(w http.ResponseWriter, r *http.Request) {
+		if r.Header.Get(csrfHeader) == "" {
+			http.Error(w, "missing "+csrfHeader+" header", http.StatusForbidden)
+			return
+		}
+		if o.Qbit == nil {
+			http.Error(w, "qBittorrent is not set up: set SEADEX_SCOUT_QBIT_URL", http.StatusNotImplemented)
+			return
+		}
+		version, err := o.Qbit.Check(r.Context())
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusBadGateway)
+			return
+		}
+		writeJSON(w, map[string]string{"version": version})
+	})
 	app.HandleFunc("POST /api/notify/test", func(w http.ResponseWriter, r *http.Request) {
 		if r.Header.Get(csrfHeader) == "" {
 			http.Error(w, "missing "+csrfHeader+" header", http.StatusForbidden)

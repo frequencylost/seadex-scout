@@ -87,7 +87,7 @@ These follow the same conditions as upstream's alert rules (see [Monitoring and 
 
 ## Send to qBittorrent
 
-With `SEADEX_SCOUT_QBIT_URL` set, every Nyaa link in the tables gets a **→ qBittorrent** button underneath. It adds that release's `.torrent` to qBittorrent under the category set for Sonarr or Radarr, depending on which app the row belongs to. Use the categories your Sonarr and Radarr qBittorrent download clients use, so they pick the download up and import it as they would one of their own grabs.
+With `SEADEX_SCOUT_QBIT_URL` set, every Nyaa link in the tables gets a **→ qBit** button underneath. It adds that release's `.torrent` to qBittorrent under the category set for Sonarr or Radarr, depending on which app the row belongs to. Use the categories your Sonarr and Radarr qBittorrent download clients use, so they pick the download up and import it as they would one of their own grabs.
 
 | Variable | Description | Default |
 | --- | --- | --- |
