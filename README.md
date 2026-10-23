@@ -89,7 +89,7 @@ This fork is not in Community Applications. Add it from its template:
 3. Click **Apply**. The template runs the container as `99:100` (nobody:users), so `/mnt/user/appdata/seadex-scout` needs no `chown`.
 4. Click the container's icon and choose **WebUI** to open the dashboard.
 
-The template's fields are grouped by what they set up: **SeaDex Scout**, **Sonarr**, **Radarr**, **ntfy**, **qBittorrent**, **Prowlarr**, **SABnzbd** and **Indexer**. Everything except the SeaDex Scout and Sonarr or Radarr groups is optional.
+The template's fields are grouped by what they set up, in this order: **SeaDex Scout**, **Sonarr**, **Radarr**, **qBittorrent**, **Prowlarr**, **SABnzbd** and **ntfy**. Everything except the SeaDex Scout and Sonarr or Radarr groups is optional. The three **Indexer** fields sit under **Show more settings**: they only apply once the optional Torznab indexer is set up in `config.yaml`.
 
 **Updating an installed container to a newer template.** `my-seadex-scout.xml` is also where Unraid keeps your container's own settings, so downloading over it replaces your entries. To pick up new fields, either:
 
