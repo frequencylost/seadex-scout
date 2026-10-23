@@ -3,6 +3,7 @@
   --surface: #ffffff;
   --surface-2: #f1f3f6;
   --border: #e2e5ea;
+  --divider: #c5cad3;
   --text: #1a1d23;
   --muted: #5f6672;
   --accent: #2563eb;
@@ -29,6 +30,7 @@
     --surface: #171a21;
     --surface-2: #1f232c;
     --border: #2a2f3a;
+    --divider: #424a59;
     --text: #e6e8ec;
     --muted: #9aa1ad;
     --accent: #3b82f6;
@@ -50,6 +52,7 @@
   --surface: #171a21;
   --surface-2: #1f232c;
   --border: #2a2f3a;
+  --divider: #424a59;
   --text: #e6e8ec;
   --muted: #9aa1ad;
   --accent: #3b82f6;
@@ -277,6 +280,15 @@ td.empty, p.empty { color: var(--muted); text-align: center; padding: 18px; }
   white-space: nowrap;
 }
 a.has-notes { text-decoration: underline dotted; text-underline-offset: 3px; cursor: help; }
+
+/* Section dividers in the finding tables: the library's columns, then
+   SeaDex best (columns 5-7), SeaDex alt (8-10), and First seen. */
+table.findings th:nth-child(5), table.findings td:nth-child(5),
+table.findings th:nth-child(8), table.findings td:nth-child(8),
+table.findings th:nth-child(11), table.findings td:nth-child(11) {
+  border-left: 1px solid var(--divider);
+  padding-left: 14px;
+}
 
 .qbit-btn {
   display: block;
