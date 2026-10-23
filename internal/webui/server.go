@@ -1,6 +1,7 @@
 package webui
 
 import (
+	"context"
 	"crypto/sha256"
 	"crypto/subtle"
 	"embed"
@@ -30,7 +31,9 @@ type Options struct {
 	ReportDir string
 	Store     *Store
 	Runner    *ReportRunner
-	Log       *slog.Logger
+	// Notifier sends the dashboard's test notification; nil when ntfy is off.
+	Notifier interface{ SendTest(context.Context) error }
+	Log      *slog.Logger
 }
 
 // NewServer returns the dashboard's HTTP server, not yet listening.
@@ -112,6 +115,21 @@ func NewServer(o Options) *http.Server {
 		o.Log.Info("report started from the dashboard")
 		w.WriteHeader(http.StatusAccepted)
 		writeJSON(w, o.Store.reportJob())
+	})
+	app.HandleFunc("POST /api/notify/test", func(w http.ResponseWriter, r *http.Request) {
+		if r.Header.Get(csrfHeader) == "" {
+			http.Error(w, "missing "+csrfHeader+" header", http.StatusForbidden)
+			return
+		}
+		if o.Notifier == nil {
+			http.Error(w, "ntfy is not set up: set SEADEX_SCOUT_NTFY_URL", http.StatusNotImplemented)
+			return
+		}
+		if err := o.Notifier.SendTest(r.Context()); err != nil {
+			http.Error(w, err.Error(), http.StatusBadGateway)
+			return
+		}
+		writeJSON(w, map[string]bool{"sent": true})
 	})
 	mux.Handle("/", basicAuth(o.Username, o.Password, app))
 

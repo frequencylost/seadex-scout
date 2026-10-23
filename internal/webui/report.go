@@ -111,13 +111,21 @@ func (rr *ReportRunner) follow(cmd *exec.Cmd, stdout io.Reader, out io.Writer) {
 	rr.mu.Lock()
 	rr.running = false
 	rr.mu.Unlock()
+	var text string
 	rr.store.setJob(func(j *ReportJob) {
 		j.Running = false
 		j.FinishedAt = time.Now().UTC()
 		if err != nil {
 			j.Error = err.Error()
 		}
+		text = j.Result
+		if j.Error != "" {
+			text = "It failed: " + j.Error
+		}
 	})
+	rr.store.mu.Lock()
+	rr.store.emit(Event{Kind: EventReports, Text: cmpOr(text, "The report run ended.")})
+	rr.store.mu.Unlock()
 	rr.store.markDirty()
 }
 

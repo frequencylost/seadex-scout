@@ -117,7 +117,10 @@ type state struct {
 	Errors     []Line          `json:"errors,omitempty"`
 	Degraded   []Line          `json:"degraded,omitempty"`
 	Conditions map[string]Line `json:"conditions,omitempty"`
-	Events     []Line          `json:"events,omitempty"`
+	// Notified holds the problems a notification announced and has not yet
+	// announced the end of, so a restart neither repeats nor loses them.
+	Notified map[string]time.Time `json:"notified,omitempty"`
+	Events   []Line               `json:"events,omitempty"`
 
 	Indexer Indexer `json:"indexer"`
 	Reports []Line  `json:"reports,omitempty"`
@@ -139,6 +142,12 @@ type Store struct {
 	job     ReportJob
 	// monitored is not persisted: it is read again within a minute of a start.
 	monitored Monitored
+
+	// Notifications (ntfy.go): events is nil until a Notifier reads it, found
+	// holds each pass's new upgrades until the pass closes.
+	events chan Event
+	found  map[int64][]Line
+	notify NotifyStatus
 }
 
 // NewStore returns an empty Store that persists to path ("" keeps it in memory).
@@ -150,7 +159,7 @@ func NewStore(path string) *Store {
 }
 
 func freshState() state {
-	return state{Version: stateVersion, Conditions: map[string]Line{}, Views: map[string]int64{}}
+	return state{Version: stateVersion, Conditions: map[string]Line{}, Notified: map[string]time.Time{}, Views: map[string]int64{}}
 }
 
 // Load reads the persisted state, if any. A missing file is not an error; a file
@@ -175,6 +184,9 @@ func (st *Store) Load() error {
 	}
 	if loaded.Conditions == nil {
 		loaded.Conditions = map[string]Line{}
+	}
+	if loaded.Notified == nil {
+		loaded.Notified = map[string]time.Time{}
 	}
 	if loaded.Views == nil {
 		loaded.Views = map[string]int64{}
@@ -293,10 +305,19 @@ func (st *Store) Observe(l Line) {
 				delete(st.pending, id)
 			}
 		}
+		st.closeFound(pass)
 	case "upgrade sizes":
 		st.s.Views[l.Str("hidden_tier")] = l.Int("upgrades")
 	case "upgrade found", "upgrade resolved":
 		st.s.Events = pushRing(st.s.Events, l, maxEvents)
+		// After a start every upgrade reads as found; only real arrivals notify.
+		if after, _ := l.Attrs["after_start"].(bool); l.Msg == "upgrade found" && !after && st.events != nil {
+			if st.found == nil {
+				st.found = map[int64][]Line{}
+			}
+			pass := l.Int("pass_id")
+			st.found[pass] = append(st.found[pass], l)
+		}
 	case "library summary":
 		st.s.Library = &l
 	case "tick complete", "tick degraded":
@@ -346,9 +367,14 @@ func (st *Store) Observe(l Line) {
 func (st *Store) observeError(l Line) {
 	if cond := l.Str("condition"); cond != "" {
 		st.s.Conditions[cond] = l
+		if _, told := st.s.Notified[cond]; !told && st.events != nil {
+			st.s.Notified[cond] = l.Time
+			st.emit(Event{Kind: EventProblems, Key: cond, Lines: []Line{l}})
+		}
 		return
 	}
 	st.s.Errors = pushRing(st.s.Errors, l, maxErrors)
+	st.emit(Event{Kind: EventErrors, Lines: []Line{l}})
 }
 
 // trimPending drops the oldest unfinished passes, so a pass that never logs
@@ -373,11 +399,12 @@ func pushRing(ring []Line, l Line, limit int) []Line {
 
 // Snapshot is what /api/state serves.
 type Snapshot struct {
-	Now       time.Time `json:"now"`
-	StartedAt time.Time `json:"started_at"`
-	Config    *Line     `json:"config,omitempty"`
-	ReportJob ReportJob `json:"report_job"`
-	Monitored Monitored `json:"monitored"`
+	Now       time.Time    `json:"now"`
+	StartedAt time.Time    `json:"started_at"`
+	Config    *Line        `json:"config,omitempty"`
+	ReportJob ReportJob    `json:"report_job"`
+	Monitored Monitored    `json:"monitored"`
+	Notify    NotifyStatus `json:"notify"`
 	state
 }
 
@@ -393,11 +420,13 @@ func (st *Store) Snapshot() Snapshot {
 	s.Cycles = slices.Clone(s.Cycles)
 	s.Reports = slices.Clone(s.Reports)
 	s.Conditions = maps.Clone(s.Conditions)
+	s.Notified = maps.Clone(s.Notified)
 	s.Views = maps.Clone(s.Views)
 	s.Indexer.ByScope = maps.Clone(s.Indexer.ByScope)
 	m := st.monitored
 	m.Unmonitored = slices.Clone(m.Unmonitored)
-	return Snapshot{Now: st.now(), StartedAt: st.started, Config: st.config, ReportJob: st.job, Monitored: m, state: s}
+	n := st.notify
+	return Snapshot{Now: st.now(), StartedAt: st.started, Config: st.config, ReportJob: st.job, Monitored: m, Notify: n, state: s}
 }
 
 // Logs returns the recent log lines, newest last.

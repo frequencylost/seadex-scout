@@ -62,6 +62,29 @@ These are environment variables rather than `config.yaml` keys. Upstream rejects
 
 `GET /healthz` answers `ok` without a sign-in, for a reverse proxy's health check.
 
+## Notifications
+
+The container can send notifications to [ntfy](https://ntfy.sh) by itself, without Loki or Alertmanager. Set `SEADEX_SCOUT_NTFY_URL` to your topic's full address, such as `https://ntfy.sh/my-seadex-topic` or the address of your own ntfy server, and subscribe to that topic in the ntfy app. On the public server, anyone who knows a topic name can read it, so pick a long, hard-to-guess name or protect it with an access token.
+
+| Variable | Description | Default |
+| --- | --- | --- |
+| `SEADEX_SCOUT_NTFY_URL` | The topic's full address. Empty turns notifications off. | _(unset)_ |
+| `SEADEX_SCOUT_NTFY_TOKEN` | An access token (`tk_...`) for a protected topic. | _(unset)_ |
+| `SEADEX_SCOUT_NTFY_USERNAME`, `SEADEX_SCOUT_NTFY_PASSWORD` | A user for a protected topic, instead of a token. | _(unset)_ |
+| `SEADEX_SCOUT_NTFY_EVENTS` | What to send, comma-separated. | `upgrades,problems,errors,reports` |
+| `SEADEX_SCOUT_NTFY_OPTIONAL` | `true` also sends upgrades where you already have a SeaDex alt. | `false` |
+| `SEADEX_SCOUT_NTFY_UNMONITORED` | `true` also sends upgrades for unmonitored series, seasons and movies. | `false` |
+| `SEADEX_SCOUT_DASHBOARD_URL` | The dashboard's address, for a Dashboard button on each message. | _(unset)_ |
+
+The events:
+
+- **upgrades**: one message per new upgrade or newer version, when a check first finds it. It gives the groups, the best and alt sizes and size changes, and buttons for Nyaa (or the release's tracker), Sonarr or Radarr, and the dashboard. Tapping the message opens the SeaDex entry. Upgrades found right after a start are not sent, so a restart or an image update sends nothing. More than 10 in one check send the first 10 and a summary.
+- **problems**: a lasting problem, such as SeaDex being unreachable or the library coming back much smaller, when it starts and when it ends. It also sends when no check has finished or started in three check intervals (at least 3 hours), and when checks run again. A problem is announced once, and a restart does not repeat it.
+- **errors**: a one-off error, such as a failed Sonarr read. The same error sends again at most every 6 hours.
+- **reports**: a report you started from the dashboard finished.
+
+These follow the same conditions as upstream's alert rules (see [Monitoring and alerts](monitoring.md#alerting)), so you get the useful part of that setup from the container alone. The **Notifications** card on the Scout health tab shows where messages go, how many were sent and the last error, and has a **Send test** button.
+
 ## Limits
 
 - The dashboard runs in daemon mode only. A container started with `mode: report` exits after its report and serves nothing.

@@ -161,6 +161,11 @@ The settings most people change:
 | `SEADEX_SCOUT_WEBUI_BIND` | Address to listen on. Empty means every interface. | _(empty)_ |
 | `SEADEX_SCOUT_WEBUI_PASSWORD` | Set it to require HTTP Basic sign-in. Empty leaves the dashboard open. | _(unset)_ |
 | `SEADEX_SCOUT_WEBUI_USERNAME` | User name for the sign-in. | `admin` |
+| `SEADEX_SCOUT_NTFY_URL` | An ntfy topic address, such as `https://ntfy.sh/my-topic`, to get notifications. Empty turns them off. | _(unset)_ |
+| `SEADEX_SCOUT_NTFY_TOKEN` | ntfy access token for a protected topic, or use `SEADEX_SCOUT_NTFY_USERNAME` and `SEADEX_SCOUT_NTFY_PASSWORD`. | _(unset)_ |
+| `SEADEX_SCOUT_NTFY_EVENTS` | What to send: `upgrades`, `problems`, `errors`, `reports`. | all four |
+| `SEADEX_SCOUT_NTFY_OPTIONAL` / `SEADEX_SCOUT_NTFY_UNMONITORED` | `true` also sends optional upgrades or unmonitored entries. | `false` |
+| `SEADEX_SCOUT_DASHBOARD_URL` | The dashboard's address, for a Dashboard button on each notification. | _(unset)_ |
 
 ## Security
 

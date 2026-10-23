@@ -9,6 +9,8 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"slices"
+	"strconv"
 	"strings"
 	"time"
 
@@ -24,6 +26,15 @@ const (
 	envWebUIBind     = "SEADEX_SCOUT_WEBUI_BIND"
 	envWebUIUsername = "SEADEX_SCOUT_WEBUI_USERNAME"
 	envWebUIPassword = "SEADEX_SCOUT_WEBUI_PASSWORD"
+
+	envNtfyURL         = "SEADEX_SCOUT_NTFY_URL"
+	envNtfyToken       = "SEADEX_SCOUT_NTFY_TOKEN"
+	envNtfyUsername    = "SEADEX_SCOUT_NTFY_USERNAME"
+	envNtfyPassword    = "SEADEX_SCOUT_NTFY_PASSWORD"
+	envNtfyEvents      = "SEADEX_SCOUT_NTFY_EVENTS"
+	envNtfyOptional    = "SEADEX_SCOUT_NTFY_OPTIONAL"
+	envNtfyUnmonitored = "SEADEX_SCOUT_NTFY_UNMONITORED"
+	envDashboardURL    = "SEADEX_SCOUT_DASHBOARD_URL"
 
 	defaultWebUIPort = "9119"
 	webUIStateFile   = "webui-state.json"
@@ -85,6 +96,8 @@ func (w *webUIRuntime) start(ctx context.Context, cfg *config.Config) func() {
 		webui.NewMonitoredPoller(sonarr, radarr, w.store, log).Run(ctx)
 	}()
 
+	notifier := startNtfy(ctx, w.store, log)
+
 	srv := webui.NewServer(webui.Options{
 		Addr:      w.addr,
 		Username:  cmp.Or(os.Getenv(envWebUIUsername), "admin"),
@@ -92,6 +105,7 @@ func (w *webUIRuntime) start(ctx context.Context, cfg *config.Config) func() {
 		ReportDir: cfg.ReportDir,
 		Store:     w.store,
 		Runner:    runner,
+		Notifier:  notifier,
 		Log:       log,
 	})
 
@@ -142,4 +156,48 @@ func (w *webUIRuntime) start(ctx context.Context, cfg *config.Config) func() {
 			log.Warn("dashboard could not save its state", "error", err)
 		}
 	}
+}
+
+// startNtfy starts ntfy notifications when SEADEX_SCOUT_NTFY_URL is set, and
+// returns the notifier for the dashboard's test button (nil when off). A bad
+// setting is logged and leaves notifications off.
+func startNtfy(ctx context.Context, store *webui.Store, log *slog.Logger) *webui.Notifier {
+	topic := strings.TrimSpace(os.Getenv(envNtfyURL))
+	if topic == "" {
+		return nil
+	}
+	events := webui.AllEvents
+	if raw := strings.TrimSpace(os.Getenv(envNtfyEvents)); raw != "" {
+		events = nil
+		for _, e := range strings.Split(raw, ",") {
+			if e = strings.ToLower(strings.TrimSpace(e)); slices.Contains(webui.AllEvents, e) {
+				events = append(events, e)
+			} else if e != "" {
+				log.Warn("ignoring an unknown ntfy event name", "env", envNtfyEvents, "event", e,
+					"valid", strings.Join(webui.AllEvents, ","))
+			}
+		}
+	}
+	n, err := webui.NewNotifier(webui.NtfyConfig{
+		TopicURL:     topic,
+		Token:        os.Getenv(envNtfyToken),
+		Username:     os.Getenv(envNtfyUsername),
+		Password:     os.Getenv(envNtfyPassword),
+		Events:       events,
+		Optional:     envTrue(envNtfyOptional),
+		Unmonitored:  envTrue(envNtfyUnmonitored),
+		DashboardURL: strings.TrimSpace(os.Getenv(envDashboardURL)),
+	}, store, log)
+	if err != nil {
+		log.Error("ntfy notifications are off", "env", envNtfyURL, "error", err)
+		return nil
+	}
+	log.Info("ntfy notifications on", "events", strings.Join(events, ","))
+	go n.Run(ctx)
+	return n
+}
+
+func envTrue(name string) bool {
+	v, _ := strconv.ParseBool(strings.TrimSpace(os.Getenv(name)))
+	return v
 }

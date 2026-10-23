@@ -669,6 +669,7 @@ function renderHealth(snap) {
   }
 
   renderCycles(snap.cycles || []);
+  renderNotify(snap.notify || {}, now);
 
   setRows($("errors").tBodies[0], (snap.errors || []).slice().reverse().map((e) => {
     const detail = Object.entries(e.attrs || {}).map(([k, v]) => `${k}=${typeof v === "string" ? v : JSON.stringify(v)}`).join("  ");
@@ -734,6 +735,38 @@ function renderCycles(cycles) {
     svg.append(t);
   }
   box.replaceChildren(svg);
+}
+
+// ---------- notifications ----------
+
+const EVENT_NAMES = { upgrades: "new upgrades", problems: "problems and their end", errors: "errors", reports: "finished reports" };
+
+function renderNotify(n, now) {
+  $("notify-test").disabled = !n.enabled;
+  const rows = n.enabled ? [
+    ["Sends to", n.target || "–"],
+    ["Sends", (n.events || []).map((e) => EVENT_NAMES[e] || e).join(", ") || "nothing"],
+    ["Sent since start", String(n.sent || 0) + (n.last_sent ? `, last ${ago(n.last_sent, now)}` : "")],
+    ["Last error", n.last_error ? `${n.last_error} (${ago(n.error_at, now)})` : "none"],
+  ] : [
+    ["Status", "Off. Set SEADEX_SCOUT_NTFY_URL to an ntfy topic, such as https://ntfy.sh/your-topic, to get a message for each new upgrade."],
+  ];
+  $("notify").replaceChildren(...rows.flatMap(([k, v]) => [el("dt", { text: k }), el("dd", { text: v })]));
+}
+
+async function sendTestNotification() {
+  const btn = $("notify-test");
+  const out = $("notify-test-result");
+  btn.disabled = true;
+  out.textContent = "Sending…";
+  try {
+    const res = await fetch("api/notify/test", { method: "POST", headers: { "X-Seadex-Scout": "1" } });
+    out.textContent = res.ok ? "Sent. Check your ntfy app." : "Failed: " + (await res.text()).trim();
+  } catch (err) {
+    out.textContent = "Failed: " + err.message;
+  }
+  btn.disabled = false;
+  refresh();
 }
 
 // ---------- reports ----------
@@ -876,6 +909,7 @@ function init() {
     $(id).addEventListener("input", () => state.snap && renderOverview(state.snap));
   }
   $("report-run").addEventListener("click", runReport);
+  $("notify-test").addEventListener("click", sendTestNotification);
   $("report-search").addEventListener("input", renderReport);
   $("report-verdict").addEventListener("input", renderReport);
   $("log-level").addEventListener("input", loadLogs);
