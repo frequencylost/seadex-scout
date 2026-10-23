@@ -579,17 +579,11 @@ function noBestDetail(a) {
   }
 }
 
-// linkCell is a release's links with, under a Nyaa link, a button that sends
-// the release to qBittorrent when that is set up.
+// linkCell is a release's links with, under a Nyaa link, the → qBit button
+// and then the → Prowlarr button, each when it is set up.
 function linkCell(a, links, nyaaURL) {
   const qbit = state.snap && state.snap.qbit;
   const td = el("td", {}, el("div", { class: "links" }, links));
-  const usenet = state.snap && state.snap.usenet;
-  if (usenet && usenet.enabled && nyaaURL && (a.arr === "sonarr" || a.arr === "radarr")) {
-    const btn = el("button", { type: "button", class: "qbit-btn", title: "Search Prowlarr for this Nyaa release's title and send a usenet copy to SABnzbd" }, "→ Prowlarr");
-    btn.addEventListener("click", () => openUsenet(nyaaURL, a));
-    td.append(btn);
-  }
   if (qbit && qbit.enabled && nyaaURL && (a.arr === "sonarr" || a.arr === "radarr")) {
     const category = (qbit.categories || {})[a.arr];
     const btn = el("button", { type: "button", class: "qbit-btn", title: `Add this Nyaa release to qBittorrent${category ? ` under the category ${category}` : ""}` }, "→ qBit");
@@ -599,6 +593,12 @@ function linkCell(a, links, nyaaURL) {
       btn.disabled = true;
     }
     btn.addEventListener("click", () => sendToQbit(btn, nyaaURL, a.arr));
+    td.append(btn);
+  }
+  const usenet = state.snap && state.snap.usenet;
+  if (usenet && usenet.enabled && nyaaURL && (a.arr === "sonarr" || a.arr === "radarr")) {
+    const btn = el("button", { type: "button", class: "qbit-btn", title: "Search Prowlarr for this Nyaa release's title and send a usenet copy to SABnzbd" }, "→ Prowlarr");
+    btn.addEventListener("click", () => openUsenet(nyaaURL, a));
     td.append(btn);
   }
   return td;
