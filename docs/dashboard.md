@@ -62,6 +62,19 @@ These are environment variables rather than `config.yaml` keys. Upstream rejects
 
 `GET /healthz` answers `ok` without a sign-in, for a reverse proxy's health check.
 
+## Refresh local library
+
+The scout reads your whole Sonarr and Radarr library only during the daily full check, so a release you download and import can stay listed for up to a day. **↻ Refresh local library**, at the right of the filter bar, shortens that:
+
+- It re-reads Sonarr and Radarr straight away, and compares them against the SeaDex catalogue the last full check downloaded, which the scout now keeps in memory.
+- **Nothing is fetched from SeaDex.** The only traffic is to your own Sonarr and Radarr. Brand-new series can still mean an AniList lookup or an anime ID map update, as in any check.
+- Upgrades you've since imported move to **Already on a SeaDex pick** or drop off.
+- It takes about as long as reading your library does. The status beside the button shows its progress, and the tables update when it ends.
+- It uses the same lock as the scheduled checks, so it never runs at the same time as one. If a check is running, it says so; try again when that finishes.
+- It needs one full check since the container started, because that is where the catalogue comes from. Right after a start, the button says to wait.
+- The daily full check still runs on its own schedule. It is what picks up new SeaDex entries and changes.
+- It logs `local library refresh started` and `local library refresh complete`, not `reconcile started` and `reconcile complete`, so it is not counted as a full check. It does not rebuild the Torznab feed or count as a SeaDex read for outage tracking.
+
 ## Notifications
 
 The container can send notifications to [ntfy](https://ntfy.sh) by itself, without Loki or Alertmanager. Set `SEADEX_SCOUT_NTFY_URL` to your topic's full address, such as `https://ntfy.sh/my-seadex-topic` or the address of your own ntfy server, and subscribe to that topic in the ntfy app. On the public server, anyone who knows a topic name can read it, so pick a long, hard-to-guess name or protect it with an access token.

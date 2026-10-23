@@ -395,6 +395,7 @@ function renderOverview(snap) {
   $("kpi-lastcheck").parentElement.className = "kpi" + (lc && lc.msg.includes("degraded") ? " warn" : "");
 
   renderLibrary(snap, now);
+  renderRefresh(snap.refresh || {}, now);
   const why = $("upgrades-why").value;
   renderFindings("upgrades", todo.filter((f) => !why || kindOf(f) === why), now,
     ready ? "Nothing to do. Your library is on SeaDex's picks." : "Waiting for the first check.");
@@ -602,6 +603,43 @@ function linkCell(a, links, nyaaURL) {
     td.append(btn);
   }
   return td;
+}
+
+// ---------- local library refresh ----------
+
+let refreshPoll = null;
+
+function renderRefresh(job, now) {
+  const btn = $("refresh-library");
+  const out = $("refresh-status");
+  btn.disabled = Boolean(job.running);
+  if (job.running) {
+    out.textContent = `Refreshing Sonarr and Radarr… (${ago(job.started_at, now).replace(" ago", "")})`;
+    // Poll faster while it runs, so the tables update as soon as it ends.
+    if (!refreshPoll) refreshPoll = setInterval(refresh, 5000);
+    return;
+  }
+  if (refreshPoll) {
+    clearInterval(refreshPoll);
+    refreshPoll = null;
+  }
+  out.textContent = !job.finished_at ? ""
+    : job.error ? `Refresh failed: ${job.error}`
+    : `Library refreshed ${ago(job.finished_at, now)}`;
+}
+
+async function refreshLibrary() {
+  const btn = $("refresh-library");
+  btn.disabled = true;
+  try {
+    const res = await fetch("api/library/refresh", { method: "POST", headers: { "X-Seadex-Scout": "1" } });
+    if (!res.ok && res.status !== 409) throw new Error((await res.text()).trim());
+  } catch (err) {
+    $("refresh-status").textContent = "Could not start: " + err.message;
+    btn.disabled = false;
+    return;
+  }
+  refresh();
 }
 
 // ---------- Prowlarr search, SABnzbd send ----------
@@ -1094,6 +1132,7 @@ function init() {
   $("notify-test").addEventListener("click", sendTestNotification);
   $("qbit-test").addEventListener("click", testQbit);
   $("usenet-test").addEventListener("click", testUsenet);
+  $("refresh-library").addEventListener("click", refreshLibrary);
   $("usenet-close").addEventListener("click", () => $("usenet-dialog").close());
   $("report-search").addEventListener("input", renderReport);
   $("report-verdict").addEventListener("input", renderReport);

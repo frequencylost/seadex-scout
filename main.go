@@ -428,6 +428,9 @@ func run(cfg *config.Config) error {
 	if err != nil {
 		return err
 	}
+	if activeWebUI != nil {
+		activeWebUI.setRefresh(localRefresh(ex, b.scout, marker))
+	}
 	marker.Set(true)
 	slog.Info("seadex-scout started", "poll_interval", cfg.PollInterval.String(), "indexer", cfg.IndexerConfigured())
 

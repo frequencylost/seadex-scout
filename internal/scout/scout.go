@@ -177,6 +177,9 @@ type Scout struct {
 	// pollInterval is the loop's own interval, which decides how many ticks
 	// separate two reconciles (see reconcileEvery).
 	pollInterval time.Duration
+	// local holds the last full catalogue and runs this fork's library-only
+	// refresh (local.go).
+	local localRefresh
 	// iterations counts the loop iterations that actually RAN a cycle, so every
 	// reconcileEvery-th one reconciles. Held here rather than in the loop's timer
 	// closure, which also runs on a tick the cross-process lock skipped.
@@ -315,7 +318,11 @@ func (s *Scout) reconcile(ctx context.Context) bool {
 	// The one line a pass emits BEFORE doing any work, and the reason the scan
 	// deadman can be tight: every other line it counts is a COMPLETION line, and a
 	// cold reconcile takes ~25 minutes.
-	s.log.Info("reconcile started", "interval", s.reconcileCadenceAttr())
+	if s.local.running {
+		s.log.Info("local library refresh started")
+	} else {
+		s.log.Info("reconcile started", "interval", s.reconcileCadenceAttr())
+	}
 	startStats := s.aniStats()
 	st := s.loadState(ctx)
 	if !s.restored {
@@ -344,11 +351,12 @@ func (s *Scout) reconcile(ctx context.Context) bool {
 	// The shared SeaDex + animap snapshot feeds BOTH halves: the Torznab feed and
 	// the compare pass, so a notification and what the arrs see stay on one fetch.
 	mapCache, idx, mapErr := s.loadMapping(ctx, &st)
-	entries, seaErr := s.seadex.FetchEntries(ctx, seadexapi.Options{Mode: seadexapi.FetchFull})
-	s.warnCatalogueLinkQuality(entries)
-
+	entries, seaErr := s.catalogue(ctx)
 	errs := cycleOutcomes{walk: walkErr, mapping: mapErr, seadex: seaErr}
-	s.rebuildFeed(ctx, entries, idx, &st, errs)
+	if !s.local.running {
+		s.warnCatalogueLinkQuality(entries)
+		s.rebuildFeed(ctx, entries, idx, &st, errs)
+	}
 
 	// From here the compare pass is gated on the arr walk (the health signal), and
 	// the gate also applies the per-arr shrink guard, which MERGES a suspect arr's
@@ -607,7 +615,11 @@ func (s *Scout) finishCompletedCycle(ctx context.Context, p *completedPass) bool
 	// A SECOND line, carrying nothing but the fact that a full pass finished: once
 	// most iterations are ticks, the deadman cannot tell "the loop is alive" from
 	// "the backstop still runs". Emitted for every reconcile that ran end to end.
-	s.log.Info("reconcile complete", "interval", s.reconcileCadenceAttr())
+	if s.local.running {
+		s.log.Info("local library refresh complete", "duration", time.Since(p.start).Round(time.Millisecond).String())
+	} else {
+		s.log.Info("reconcile complete", "interval", s.reconcileCadenceAttr())
+	}
 
 	st.Library, st.Mapping, st.Memo = *snap, *p.mapCache, result.Memo
 	s.save(ctx, st)
@@ -853,7 +865,10 @@ func (s *Scout) handlePreCompareGate(ctx context.Context, st *state.State, snap 
 	// Record the SeaDex fetch outcome exactly once, before the mutually exclusive
 	// gates below pick a winner: gate precedence must not decide whether an
 	// observed SeaDex outage exists in persisted state.
-	s.recordSeaDexFetch(ctx, st, errs.seadex)
+	if !s.local.running {
+		// A local refresh read nothing from SeaDex, so it is evidence of neither.
+		s.recordSeaDexFetch(ctx, st, errs.seadex)
+	}
 	if walkHandled, walkHealthy := s.handleLibraryGate(ctx, st, mapCache, errs); walkHandled {
 		return true, walkHealthy, nil
 	}

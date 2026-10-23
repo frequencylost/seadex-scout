@@ -37,7 +37,9 @@ type Options struct {
 	Qbit *Qbit
 	// Usenet searches Prowlarr and sends to SABnzbd; nil when not set up.
 	Usenet *Usenet
-	Log    *slog.Logger
+	// Refresher runs the local library refresh; nil when it cannot run.
+	Refresher *LibraryRefresher
+	Log       *slog.Logger
 }
 
 // NewServer returns the dashboard's HTTP server, not yet listening.
@@ -215,6 +217,23 @@ func NewServer(o Options) *http.Server {
 			return
 		}
 		writeJSON(w, map[string]string{"prowlarr": prowlarr, "sabnzbd": sab})
+	})
+	app.HandleFunc("POST /api/library/refresh", func(w http.ResponseWriter, r *http.Request) {
+		if r.Header.Get(csrfHeader) == "" {
+			http.Error(w, "missing "+csrfHeader+" header", http.StatusForbidden)
+			return
+		}
+		if o.Refresher == nil {
+			http.Error(w, "the library refresh is not available", http.StatusNotImplemented)
+			return
+		}
+		if err := o.Refresher.Start(); err != nil {
+			http.Error(w, err.Error(), http.StatusConflict)
+			return
+		}
+		o.Log.Info("local library refresh requested from the dashboard")
+		w.WriteHeader(http.StatusAccepted)
+		writeJSON(w, map[string]bool{"started": true})
 	})
 	app.HandleFunc("POST /api/qbit/test", func(w http.ResponseWriter, r *http.Request) {
 		if r.Header.Get(csrfHeader) == "" {

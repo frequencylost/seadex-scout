@@ -2,6 +2,7 @@ package webui
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -142,7 +143,12 @@ func TestDemo(t *testing.T) {
 	}
 	// A stand-in Nyaa, Prowlarr and SABnzbd for the → Prowlarr buttons.
 	usenet := testUsenet(t, newFakeUsenet(t), "sk")
-	srv := NewServer(Options{Addr: addr, ReportDir: dir, Store: store, Qbit: qbit, Usenet: usenet, Log: slog.Default()})
+	// A stand-in library refresh that takes a few seconds.
+	refresher := NewLibraryRefresher(context.Background(), func(ctx context.Context) error {
+		time.Sleep(4 * time.Second)
+		return nil
+	}, store)
+	srv := NewServer(Options{Addr: addr, ReportDir: dir, Store: store, Qbit: qbit, Usenet: usenet, Refresher: refresher, Log: slog.Default()})
 	t.Logf("demo dashboard on http://%s", addr)
 	if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 		t.Fatal(err)

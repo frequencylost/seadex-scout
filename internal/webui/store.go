@@ -148,6 +148,8 @@ type Store struct {
 	events chan Event
 	found  map[int64][]Line
 	notify NotifyStatus
+
+	refresh RefreshJob // the dashboard's local library refresh (refresh.go)
 }
 
 // NewStore returns an empty Store that persists to path ("" keeps it in memory).
@@ -407,6 +409,7 @@ type Snapshot struct {
 	Notify    NotifyStatus `json:"notify"`
 	Qbit      QbitStatus   `json:"qbit"`
 	Usenet    UsenetStatus `json:"usenet"`
+	Refresh   RefreshJob   `json:"refresh"`
 	state
 }
 
@@ -428,7 +431,7 @@ func (st *Store) Snapshot() Snapshot {
 	m := st.monitored
 	m.Unmonitored = slices.Clone(m.Unmonitored)
 	n := st.notify
-	return Snapshot{Now: st.now(), StartedAt: st.started, Config: st.config, ReportJob: st.job, Monitored: m, Notify: n, state: s}
+	return Snapshot{Now: st.now(), StartedAt: st.started, Config: st.config, ReportJob: st.job, Monitored: m, Notify: n, Refresh: st.refresh, state: s}
 }
 
 // Logs returns the recent log lines, newest last.

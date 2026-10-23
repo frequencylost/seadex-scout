@@ -12,9 +12,13 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
+	"github.com/cplieger/health"
+	"github.com/cplieger/scheduler/v4"
 	"github.com/cplieger/seadex-scout/internal/config"
+	"github.com/cplieger/seadex-scout/internal/scout"
 	"github.com/cplieger/seadex-scout/internal/webui"
 )
 
@@ -62,6 +66,28 @@ var activeWebUI *webUIRuntime
 type webUIRuntime struct {
 	store *webui.Store
 	addr  string
+
+	// refresh runs the scout's local library refresh. It is set once the
+	// scout and the cycle lock exist, after the server started.
+	refreshMu sync.Mutex
+	refresh   func(context.Context) error
+}
+
+// setRefresh makes the dashboard's Refresh local library button work.
+func (w *webUIRuntime) setRefresh(run func(context.Context) error) {
+	w.refreshMu.Lock()
+	w.refresh = run
+	w.refreshMu.Unlock()
+}
+
+func (w *webUIRuntime) runRefresh(ctx context.Context) error {
+	w.refreshMu.Lock()
+	run := w.refresh
+	w.refreshMu.Unlock()
+	if run == nil {
+		return errors.New("seadex-scout is still starting; try again in a moment")
+	}
+	return run(ctx)
 }
 
 // installWebUI wraps the default logger so the dashboard sees every log line
@@ -121,6 +147,7 @@ func (w *webUIRuntime) start(ctx context.Context, cfg *config.Config) func() {
 		Notifier:  notifier,
 		Qbit:      newQbit(log),
 		Usenet:    newUsenet(log),
+		Refresher: webui.NewLibraryRefresher(ctx, w.runRefresh, w.store),
 		Log:       log,
 	})
 
@@ -264,4 +291,37 @@ func newUsenet(log *slog.Logger) *webui.Usenet {
 	}
 	log.Info("Prowlarr search and SABnzbd sending on")
 	return u
+}
+
+// errCheckRunning means a scheduled check holds the cycle lock.
+var errCheckRunning = errors.New("a SeaDex check is running right now; try again when it finishes")
+
+// localRefresh runs the scout's local library refresh under the cycle lock the
+// scheduled checks take, so the two never overlap, and records its health the
+// way a check does.
+func localRefresh(ex *scheduler.Exclusive, sc *scout.Scout, marker *health.Marker) func(context.Context) error {
+	return func(ctx context.Context) error {
+		var refreshErr error
+		outcome, err := ex.RunOrSkip(func() error {
+			healthy, err := sc.RefreshLocal(ctx)
+			if err != nil {
+				refreshErr = err
+				return nil
+			}
+			if !healthy && ctx.Err() == nil {
+				refreshErr = errors.New("Sonarr or Radarr could not be read; see the log")
+			}
+			if err := marker.SetChecked(healthy); err != nil {
+				slog.Error("library refresh could not record health", "error", err)
+			}
+			return nil
+		})
+		switch {
+		case outcome == scheduler.OutcomeSkipped:
+			return errCheckRunning
+		case err != nil:
+			return err
+		}
+		return refreshErr
+	}
 }
