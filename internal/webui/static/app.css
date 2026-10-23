@@ -299,6 +299,18 @@ table.findings th:nth-child(11), table.findings td:nth-child(11) {
   white-space: nowrap;
   color: var(--accent);
 }
+.usenet-dialog {
+  width: min(1100px, calc(100vw - 32px));
+  max-height: calc(100vh - 64px);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface);
+  color: var(--text);
+  padding: 16px 18px;
+}
+.usenet-dialog::backdrop { background: rgb(0 0 0 / 0.5); }
+.usenet-dialog p { margin: 4px 0; }
+.exact { color: var(--good); font-weight: 600; }
 .qbit-btn.done { color: var(--good); border-color: var(--good); }
 .qbit-btn.failed { color: var(--bad); border-color: var(--bad); }
 .tag { display: inline-block; padding: 1px 8px; border-radius: 6px; font-size: 12px; white-space: nowrap; background: var(--surface-2); }

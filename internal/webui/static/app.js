@@ -584,6 +584,12 @@ function noBestDetail(a) {
 function linkCell(a, links, nyaaURL) {
   const qbit = state.snap && state.snap.qbit;
   const td = el("td", {}, el("div", { class: "links" }, links));
+  const usenet = state.snap && state.snap.usenet;
+  if (usenet && usenet.enabled && nyaaURL && (a.arr === "sonarr" || a.arr === "radarr")) {
+    const btn = el("button", { type: "button", class: "qbit-btn", title: "Search Prowlarr for this Nyaa release's title and send a usenet copy to SABnzbd" }, "→ Prowlarr");
+    btn.addEventListener("click", () => openUsenet(nyaaURL, a));
+    td.append(btn);
+  }
   if (qbit && qbit.enabled && nyaaURL && (a.arr === "sonarr" || a.arr === "radarr")) {
     const category = (qbit.categories || {})[a.arr];
     const btn = el("button", { type: "button", class: "qbit-btn", title: `Add this Nyaa release to qBittorrent${category ? ` under the category ${category}` : ""}` }, "→ qBit");
@@ -596,6 +602,95 @@ function linkCell(a, links, nyaaURL) {
     td.append(btn);
   }
   return td;
+}
+
+// ---------- Prowlarr search, SABnzbd send ----------
+
+async function openUsenet(nyaaURL, a) {
+  const dlg = $("usenet-dialog");
+  const body = $("usenet-results").tBodies[0];
+  $("usenet-query").textContent = "…";
+  $("usenet-status").textContent = "Reading the Nyaa title and searching Prowlarr. This can take a while.";
+  body.replaceChildren();
+  if (!dlg.open) dlg.showModal();
+  const category = ((state.snap.usenet || {}).categories || {})[a.arr];
+  try {
+    const res = await fetch("api/prowlarr/search", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "X-Seadex-Scout": "1" },
+      body: JSON.stringify({ url: nyaaURL }),
+    });
+    if (!res.ok) throw new Error((await res.text()).trim());
+    const found = await res.json();
+    $("usenet-query").textContent = found.query;
+    const exact = found.results.filter((r) => r.exact).length;
+    $("usenet-status").textContent = found.results.length
+      ? `${found.results.length} usenet results, ${exact} with exactly this title. Send adds it to SABnzbd${category ? ` under ${category}` : ""} for ${arrName(a.arr)}.`
+      : `No usenet results${found.other ? ` (${found.other} torrent results left out)` : ""}.`;
+    const now = Date.now();
+    body.replaceChildren(...found.results.map((r) => {
+      const send = el("button", { type: "button", class: "qbit-btn" }, "Send");
+      send.addEventListener("click", () => sendToSab(send, found.token, r.id, a.arr));
+      return el("tr", {},
+        el("td", {}, r.exact ? el("span", { class: "exact", text: "✓ exact " }) : null, r.title),
+        el("td", { text: r.indexer || "–" }),
+        el("td", { class: "num", text: fmtBytes(r.size) }),
+        el("td", { class: "num", text: r.posted ? ago(r.posted, now) : "–" }),
+        el("td", { class: "num", text: String(r.grabs ?? "–") }),
+        el("td", {}, send));
+    }));
+  } catch (err) {
+    $("usenet-status").textContent = "Failed: " + err.message;
+  }
+}
+
+async function sendToSab(btn, token, id, arr) {
+  btn.disabled = true;
+  btn.textContent = "Sending…";
+  try {
+    const res = await fetch("api/sabnzbd/add", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "X-Seadex-Scout": "1" },
+      body: JSON.stringify({ token, id, arr }),
+    });
+    if (!res.ok) throw new Error((await res.text()).trim());
+    const out = await res.json();
+    btn.textContent = "Sent ✓";
+    btn.classList.add("done");
+    btn.title = out.category ? `Added to SABnzbd under ${out.category}` : "Added to SABnzbd";
+  } catch (err) {
+    btn.textContent = "Failed – retry";
+    btn.classList.add("failed");
+    btn.title = err.message;
+    btn.disabled = false;
+  }
+}
+
+function renderUsenet(u) {
+  $("usenet-test").disabled = !u.enabled;
+  const cats = u.categories || {};
+  const rows = u.enabled ? [
+    ["Status", "On: Nyaa links have a → Prowlarr button"],
+    ["Sonarr category", cats.sonarr || "SABnzbd's default"],
+    ["Radarr category", cats.radarr || "SABnzbd's default"],
+  ] : [["Status", "Off. Set the Prowlarr URL and API key and the SABnzbd URL and API key to search Prowlarr for a Nyaa release's title and send a usenet copy to SABnzbd."]];
+  $("usenet").replaceChildren(...rows.flatMap(([k, v]) => [el("dt", { text: k }), el("dd", { text: v })]));
+}
+
+async function testUsenet() {
+  const btn = $("usenet-test");
+  const out = $("usenet-test-result");
+  btn.disabled = true;
+  out.textContent = "Connecting…";
+  try {
+    const res = await fetch("api/usenet/test", { method: "POST", headers: { "X-Seadex-Scout": "1" } });
+    if (!res.ok) throw new Error((await res.text()).trim());
+    const v = await res.json();
+    out.textContent = `Connected to Prowlarr ${v.prowlarr} and SABnzbd ${v.sabnzbd}`;
+  } catch (err) {
+    out.textContent = "Failed: " + err.message;
+  }
+  btn.disabled = false;
 }
 
 async function sendToQbit(btn, url, arr) {
@@ -729,6 +824,7 @@ function renderHealth(snap) {
   renderCycles(snap.cycles || []);
   renderNotify(snap.notify || {}, now);
   renderQbit(snap.qbit || {});
+  renderUsenet(snap.usenet || {});
 
   setRows($("errors").tBodies[0], (snap.errors || []).slice().reverse().map((e) => {
     const detail = Object.entries(e.attrs || {}).map(([k, v]) => `${k}=${typeof v === "string" ? v : JSON.stringify(v)}`).join("  ");
@@ -997,6 +1093,8 @@ function init() {
   $("report-run").addEventListener("click", runReport);
   $("notify-test").addEventListener("click", sendTestNotification);
   $("qbit-test").addEventListener("click", testQbit);
+  $("usenet-test").addEventListener("click", testUsenet);
+  $("usenet-close").addEventListener("click", () => $("usenet-dialog").close());
   $("report-search").addEventListener("input", renderReport);
   $("report-verdict").addEventListener("input", renderReport);
   $("log-level").addEventListener("input", loadLogs);

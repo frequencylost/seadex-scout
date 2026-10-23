@@ -104,6 +104,32 @@ How it behaves:
 - Use the server's LAN address for qBittorrent. A Tailscale `*.ts.net` name does not resolve inside the container.
 - A button that has added its release shows **Added ✓** until the page is reloaded. A failure shows **Failed – retry**, with qBittorrent's reason on hover.
 
+## Search Prowlarr and send to SABnzbd
+
+With Prowlarr and SABnzbd set up, every Nyaa link also gets a **→ Prowlarr** button. It does the usenet route by hand-search for you:
+
+1. It reads the release title at the top of the Nyaa page, such as `[hchcsen] Aim for the Top! GunBuster & DieBuster (Top o Nerae 1 & 2!) [BD 1080p x264 Hi10P FLAC]`. That is the page's heading, not a folder or file name from its file list.
+2. It searches Prowlarr for exactly that text, across every indexer Prowlarr has, and keeps the usenet results. Sites such as AnimeTosho repost Nyaa releases to usenet under the same name.
+3. A panel lists the results. Those whose title matches exactly, ignoring case, spacing and punctuation, are marked **✓ exact** and come first, with indexer, size, age and grabs.
+4. **Send** adds the one you pick to SABnzbd, under the category set for the row's app, so Sonarr or Radarr imports it as one of its own.
+
+| Variable | Description | Default |
+| --- | --- | --- |
+| `SEADEX_SCOUT_PROWLARR_URL` | Prowlarr's address, such as `http://192.168.1.10:9696`. | _(unset)_ |
+| `SEADEX_SCOUT_PROWLARR_KEY` | Prowlarr's API key. The optional indexer can use the same one. | _(unset)_ |
+| `SEADEX_SCOUT_SABNZBD_URL` | SABnzbd's address, such as `http://192.168.1.10:8080`. | _(unset)_ |
+| `SEADEX_SCOUT_SABNZBD_KEY` | SABnzbd's API key (not its NZB key). | _(unset)_ |
+| `SEADEX_SCOUT_SABNZBD_CATEGORY_SONARR`, `SEADEX_SCOUT_SABNZBD_CATEGORY_RADARR` | The category each app's releases go to; it must exist in SABnzbd. | SABnzbd's default |
+
+The buttons show only when all four addresses and keys are set. Some things to know:
+
+- Each click is one live Prowlarr search, which can take a while and counts toward your indexers' API limits, as a search by hand does.
+- The panel never sends anything by itself.
+- The page picks a result by its place in a search the server made in the last 30 minutes, never by address, so it cannot make SABnzbd fetch anything else.
+- Release titles are kept in memory, so searching the same Nyaa release again does not fetch its page again.
+- The **Prowlarr and SABnzbd** card on the Scout health tab has a **Test connection** button. It checks both API keys and that the two categories exist in SABnzbd.
+- Use LAN addresses. A Tailscale `*.ts.net` name does not resolve inside the container.
+
 ## Limits
 
 - The dashboard runs in daemon mode only. A container started with `mode: report` exits after its report and serves nothing.

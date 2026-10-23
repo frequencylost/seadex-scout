@@ -406,6 +406,7 @@ type Snapshot struct {
 	Monitored Monitored    `json:"monitored"`
 	Notify    NotifyStatus `json:"notify"`
 	Qbit      QbitStatus   `json:"qbit"`
+	Usenet    UsenetStatus `json:"usenet"`
 	state
 }
 

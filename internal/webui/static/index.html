@@ -135,6 +135,17 @@
 
     <div class="card">
       <div class="card-head">
+        <h2>Prowlarr and SABnzbd</h2>
+        <div class="controls">
+          <span id="usenet-test-result" class="muted small"></span>
+          <button id="usenet-test" type="button">Test connection</button>
+        </div>
+      </div>
+      <dl id="usenet" class="kv"></dl>
+    </div>
+
+    <div class="card">
+      <div class="card-head">
         <h2>qBittorrent</h2>
         <div class="controls">
           <span id="qbit-test-result" class="muted small"></span>
@@ -228,6 +239,21 @@
     </div>
   </section>
 </main>
+
+<dialog id="usenet-dialog" class="usenet-dialog">
+  <div class="card-head">
+    <h2>Search Prowlarr</h2>
+    <button id="usenet-close" type="button" aria-label="Close">✕</button>
+  </div>
+  <p class="muted small">Nyaa title: <strong id="usenet-query"></strong></p>
+  <p id="usenet-status" class="muted small"></p>
+  <div class="table-wrap">
+    <table id="usenet-results" class="data">
+      <thead><tr><th>Usenet release</th><th>Indexer</th><th class="num">Size</th><th class="num">Posted</th><th class="num">Grabs</th><th></th></tr></thead>
+      <tbody></tbody>
+    </table>
+  </div>
+</dialog>
 
 <footer class="muted small">
   <span id="footer-text"></span>

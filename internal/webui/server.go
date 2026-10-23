@@ -35,7 +35,9 @@ type Options struct {
 	Notifier interface{ SendTest(context.Context) error }
 	// Qbit sends releases to qBittorrent; nil when it is not set up.
 	Qbit *Qbit
-	Log  *slog.Logger
+	// Usenet searches Prowlarr and sends to SABnzbd; nil when not set up.
+	Usenet *Usenet
+	Log    *slog.Logger
 }
 
 // NewServer returns the dashboard's HTTP server, not yet listening.
@@ -62,6 +64,9 @@ func NewServer(o Options) *http.Server {
 		snap := o.Store.Snapshot()
 		if o.Qbit != nil {
 			snap.Qbit = o.Qbit.Status()
+		}
+		if o.Usenet != nil {
+			snap.Usenet = o.Usenet.Status()
 		}
 		writeJSON(w, snap)
 	})
@@ -147,6 +152,69 @@ func NewServer(o Options) *http.Server {
 		}
 		o.Log.Info("release sent to qBittorrent", "url", in.URL, "category", category)
 		writeJSON(w, map[string]string{"category": category})
+	})
+	usenetOff := func(w http.ResponseWriter, r *http.Request) bool {
+		if r.Header.Get(csrfHeader) == "" {
+			http.Error(w, "missing "+csrfHeader+" header", http.StatusForbidden)
+			return true
+		}
+		if o.Usenet == nil {
+			http.Error(w, "Prowlarr and SABnzbd are not set up: set SEADEX_SCOUT_PROWLARR_URL, SEADEX_SCOUT_PROWLARR_KEY, SEADEX_SCOUT_SABNZBD_URL and SEADEX_SCOUT_SABNZBD_KEY", http.StatusNotImplemented)
+			return true
+		}
+		return false
+	}
+	app.HandleFunc("POST /api/prowlarr/search", func(w http.ResponseWriter, r *http.Request) {
+		if usenetOff(w, r) {
+			return
+		}
+		var in struct {
+			URL string `json:"url"`
+		}
+		if err := json.NewDecoder(io.LimitReader(r.Body, 4096)).Decode(&in); err != nil {
+			http.Error(w, "bad request", http.StatusBadRequest)
+			return
+		}
+		found, err := o.Usenet.Search(r.Context(), in.URL)
+		if err != nil {
+			o.Log.Warn("Prowlarr search from the dashboard failed", "error", err)
+			http.Error(w, err.Error(), http.StatusBadGateway)
+			return
+		}
+		writeJSON(w, found)
+	})
+	app.HandleFunc("POST /api/sabnzbd/add", func(w http.ResponseWriter, r *http.Request) {
+		if usenetOff(w, r) {
+			return
+		}
+		var in struct {
+			Token string `json:"token"`
+			ID    int    `json:"id"`
+			Arr   string `json:"arr"`
+		}
+		if err := json.NewDecoder(io.LimitReader(r.Body, 4096)).Decode(&in); err != nil {
+			http.Error(w, "bad request", http.StatusBadRequest)
+			return
+		}
+		category, err := o.Usenet.Send(r.Context(), in.Token, in.ID, in.Arr)
+		if err != nil {
+			o.Log.Warn("could not send a release to SABnzbd", "error", err)
+			http.Error(w, err.Error(), http.StatusBadGateway)
+			return
+		}
+		o.Log.Info("release sent to SABnzbd", "category", category)
+		writeJSON(w, map[string]string{"category": category})
+	})
+	app.HandleFunc("POST /api/usenet/test", func(w http.ResponseWriter, r *http.Request) {
+		if usenetOff(w, r) {
+			return
+		}
+		prowlarr, sab, err := o.Usenet.Check(r.Context())
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusBadGateway)
+			return
+		}
+		writeJSON(w, map[string]string{"prowlarr": prowlarr, "sabnzbd": sab})
 	})
 	app.HandleFunc("POST /api/qbit/test", func(w http.ResponseWriter, r *http.Request) {
 		if r.Header.Get(csrfHeader) == "" {

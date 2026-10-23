@@ -89,6 +89,13 @@ This fork is not in Community Applications. Add it from its template:
 3. Click **Apply**. The template runs the container as `99:100` (nobody:users), so `/mnt/user/appdata/seadex-scout` needs no `chown`.
 4. Click the container's icon and choose **WebUI** to open the dashboard.
 
+The template's fields are grouped by what they set up: **SeaDex Scout**, **Sonarr**, **Radarr**, **ntfy**, **qBittorrent**, **Prowlarr**, **SABnzbd** and **Indexer**. Everything except the SeaDex Scout and Sonarr or Radarr groups is optional.
+
+**Updating an installed container to a newer template.** `my-seadex-scout.xml` is also where Unraid keeps your container's own settings, so downloading over it replaces your entries. To pick up new fields, either:
+
+- add the new variables by hand: edit the container, click **Add another Path, Port, Variable, Label or Device**, and use the variable names in the tables below, or
+- note your settings, download the template again, and enter them again.
+
 ## Reading the results
 
 The Grafana dashboard each release ships, for Grafana 13.2 or newer, lists up to 200 current upgrades with links to the release and the show in Sonarr or Radarr. Each row shows the download size and the size change when they are known. The dashboard also shows how much of your library is at SeaDex's best or alt. Tiles at the top appear only while the scout needs a look, such as checks that stopped or an error to fix. [Monitoring and alerts](docs/monitoring.md#dashboard) shows how to import it.
@@ -169,6 +176,9 @@ The settings most people change:
 | `SEADEX_SCOUT_QBIT_URL` | qBittorrent's Web UI address, for a Send to qBittorrent button under each Nyaa link. | _(unset)_ |
 | `SEADEX_SCOUT_QBIT_USERNAME`, `SEADEX_SCOUT_QBIT_PASSWORD` | The qBittorrent Web UI sign-in. | _(unset)_ |
 | `SEADEX_SCOUT_QBIT_CATEGORY_SONARR`, `SEADEX_SCOUT_QBIT_CATEGORY_RADARR` | The category each app's releases are added under. | _(none)_ |
+| `SEADEX_SCOUT_PROWLARR_URL`, `SEADEX_SCOUT_PROWLARR_KEY` | Prowlarr's address and API key, for a → Prowlarr button under each Nyaa link. The key is also the one the optional indexer can name. | _(unset)_ |
+| `SEADEX_SCOUT_SABNZBD_URL`, `SEADEX_SCOUT_SABNZBD_KEY` | SABnzbd's address and API key, where the → Prowlarr button sends. | _(unset)_ |
+| `SEADEX_SCOUT_SABNZBD_CATEGORY_SONARR`, `SEADEX_SCOUT_SABNZBD_CATEGORY_RADARR` | The SABnzbd category each app's releases go to. | SABnzbd's default |
 
 ## Security
 

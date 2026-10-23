@@ -42,6 +42,13 @@ const (
 	envQbitCategorySonarr = "SEADEX_SCOUT_QBIT_CATEGORY_SONARR"
 	envQbitCategoryRadarr = "SEADEX_SCOUT_QBIT_CATEGORY_RADARR"
 
+	envProwlarrURL       = "SEADEX_SCOUT_PROWLARR_URL"
+	envProwlarrKey       = "SEADEX_SCOUT_PROWLARR_KEY" // shared with the indexer's ${VAR}
+	envSabURL            = "SEADEX_SCOUT_SABNZBD_URL"
+	envSabKey            = "SEADEX_SCOUT_SABNZBD_KEY"
+	envSabCategorySonarr = "SEADEX_SCOUT_SABNZBD_CATEGORY_SONARR"
+	envSabCategoryRadarr = "SEADEX_SCOUT_SABNZBD_CATEGORY_RADARR"
+
 	defaultWebUIPort = "9119"
 	webUIStateFile   = "webui-state.json"
 	webUISaveEvery   = time.Minute
@@ -113,6 +120,7 @@ func (w *webUIRuntime) start(ctx context.Context, cfg *config.Config) func() {
 		Runner:    runner,
 		Notifier:  notifier,
 		Qbit:      newQbit(log),
+		Usenet:    newUsenet(log),
 		Log:       log,
 	})
 
@@ -231,4 +239,29 @@ func newQbit(log *slog.Logger) *webui.Qbit {
 	}
 	log.Info("Send to qBittorrent on")
 	return q
+}
+
+// newUsenet sets up the → Prowlarr buttons when both Prowlarr and SABnzbd
+// are set, or returns nil. A partial or bad setting is logged.
+func newUsenet(log *slog.Logger) *webui.Usenet {
+	prowlarr, sab := strings.TrimSpace(os.Getenv(envProwlarrURL)), strings.TrimSpace(os.Getenv(envSabURL))
+	if prowlarr == "" && sab == "" {
+		return nil
+	}
+	u, err := webui.NewUsenet(webui.UsenetConfig{
+		ProwlarrURL: prowlarr,
+		ProwlarrKey: strings.TrimSpace(os.Getenv(envProwlarrKey)),
+		SabURL:      sab,
+		SabKey:      strings.TrimSpace(os.Getenv(envSabKey)),
+		Categories: map[string]string{
+			"sonarr": strings.TrimSpace(os.Getenv(envSabCategorySonarr)),
+			"radarr": strings.TrimSpace(os.Getenv(envSabCategoryRadarr)),
+		},
+	})
+	if err != nil {
+		log.Error("the Prowlarr buttons are off", "error", err)
+		return nil
+	}
+	log.Info("Prowlarr search and SABnzbd sending on")
+	return u
 }
