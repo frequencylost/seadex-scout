@@ -547,8 +547,8 @@ function findingRow(f, now) {
   if (!bestLinks.length && a.release_url) bestLinks.push(link(a.release_url, a.tracker || "Release"));
   const notes = [a.seadex_tags, a.entry_incomplete ? "SeaDex entry incomplete" : ""].filter(Boolean).join(" · ");
   const best = a.recommended_group
-    ? el("td", {}, link(entry, groupWithRevision(a.recommended_group, newer ? a.recommended_revision : "")), notes ? el("span", { class: "sub", text: notes }) : null)
-    : el("td", {}, link(entry, noBestText(a)), el("span", { class: "sub", text: noBestDetail(a) }));
+    ? el("td", {}, withNotes(link(entry, groupWithRevision(a.recommended_group, newer ? a.recommended_revision : "")), a), notes ? el("span", { class: "sub", text: notes }) : null)
+    : el("td", {}, withNotes(link(entry, noBestText(a)), a), el("span", { class: "sub", text: noBestDetail(a) }));
   return el("tr", {},
     el("td", {}, link(a.arr_url, a.title || "?"), el("span", { class: "sub", text: `${arrName(a.arr)} · ${seasonLabel(a)}` })),
     el("td", { class: "num", text: a.status === "not_downloaded" ? "–" : fmtBytes(a.library_bytes) }),
@@ -642,11 +642,26 @@ function releaseLinks(a, prefix) {
 
 // altCell names the alt release shown beside it, linked to the SeaDex entry
 // like the best, with any other alt groups SeaDex lists underneath.
+// withNotes shows the SeaDex entry's notes when hovering a group name, and
+// marks names that have them with a dotted underline.
+function withNotes(node, a) {
+  const notes = typeof a.seadex_notes === "string" ? a.seadex_notes.trim() : "";
+  if (notes && node instanceof Element) {
+    node.title = "SeaDex notes:\n" + notes;
+    node.classList.add("has-notes");
+  }
+  return node;
+}
+
 function altCell(a, entry) {
   const all = typeof a.alt_groups === "string" && a.alt_groups ? a.alt_groups.split(",") : [];
   if (!a.alt_group) return el("td", { text: all.join(", ") || "–" });
   const others = all.filter((g) => g.toLowerCase() !== a.alt_group.toLowerCase());
-  return el("td", {}, link(entry, a.alt_group), others.length ? el("span", { class: "sub", text: "also " + others.join(", ") }) : null);
+  const sameGroup = (a.recommended_group || "").toLowerCase() === a.alt_group.toLowerCase();
+  return el("td", {}, withNotes(link(entry, a.alt_group), a),
+    a.alt_seadex_tags ? el("span", { class: "sub", text: a.alt_seadex_tags }) : null,
+    sameGroup ? el("span", { class: "sub", text: "a different release by the same group" }) : null,
+    others.length ? el("span", { class: "sub", text: "also " + others.join(", ") }) : null);
 }
 
 // ---------- render: activity ----------

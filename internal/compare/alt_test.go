@@ -66,3 +66,14 @@ func TestAltReleaseAbsent(t *testing.T) {
 		t.Errorf("AnimeBytes alt with the toggle off: Alt = %+v, want zero", f.Alt)
 	}
 }
+
+// TestAltReleaseOfTheBestGroup pins an alt by the best release's own group:
+// SeaDex marks torrents, not groups, as best, as with MrManager's unrestored
+// (best) and restored (alt) remuxes of entry 2461.
+func TestAltReleaseOfTheBestGroup(t *testing.T) {
+	alt := altPack("SubsPlease", 12, 7, gib/4)
+	f := sizeOne(t, sizedSeries(), mapping.Record{SeasonTvdb: 1}, []seadex.Torrent{pack(1, 12, 1), alt})
+	if f.Alt.Group != "SubsPlease" || f.Alt.ReleaseBytes != 3*gib || len(f.Alt.Links) != 1 || f.Alt.Links[0].URL != alt.URL {
+		t.Fatalf("Alt = %+v, want SubsPlease's non-best pack", f.Alt)
+	}
+}

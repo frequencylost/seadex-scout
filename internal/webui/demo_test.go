@@ -72,7 +72,9 @@ func TestDemo(t *testing.T) {
 			kvs = append(kvs, "recommended_bytes", s.size, "size_change_bytes", s.change, "library_bytes", s.size-s.change)
 		}
 		if i%3 != 2 {
-			kvs = append(kvs, "alt_group", "Vodes", "alt_nyaa_url", fmt.Sprintf("https://nyaa.si/view/%d", 1800000+i),
+			kvs = append(kvs, "alt_group", "Vodes", "alt_seadex_tags", "alt · encode · 1080p · dual-audio",
+				"seadex_notes", "Okay-Subs is a BD encode with fixed subtitles.\nVodes is a smaller encode with slightly less detail.",
+				"alt_nyaa_url", fmt.Sprintf("https://nyaa.si/view/%d", 1800000+i),
 				"alt_recommended_bytes", s.size/3)
 			if i != 1 { // Vinland Saga's alt shows the approximate change
 				kvs = append(kvs, "alt_size_change_bytes", s.change/3-(1<<30))

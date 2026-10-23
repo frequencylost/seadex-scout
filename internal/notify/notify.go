@@ -533,6 +533,10 @@ func seadexTags(f *compare.Finding) string {
 		tags = append(tags, "mixed-group")
 	case compare.StatusUnverifiable:
 		tags = append(tags, "unverifiable")
+	case compare.StatusAtBest, compare.StatusNotDownloaded:
+		if f.RecommendedGroup != "" {
+			tags = append(tags, "best")
+		}
 	}
 	if f.Kind != "" && f.Kind != string(release.KindUnknown) {
 		tags = append(tags, f.Kind)

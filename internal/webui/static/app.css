@@ -276,6 +276,8 @@ td.empty, p.empty { color: var(--muted); text-align: center; padding: 18px; }
   font-size: 12px;
   white-space: nowrap;
 }
+a.has-notes { text-decoration: underline dotted; text-underline-offset: 3px; cursor: help; }
+
 .qbit-btn {
   display: block;
   margin-top: 4px;

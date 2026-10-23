@@ -21,18 +21,18 @@ type AltRelease struct {
 	// for the alt's download set, and stay zero when unknown.
 	ReleaseBytes int64
 	CurrentBytes int64
+	// Kind, Resolution and DualAudio describe Group's headline release, as
+	// Finding's fields of the same names describe the best one.
+	Kind       string
+	Resolution string
+	DualAudio  bool
 }
 
-// alternatives is recommended's twin for the non-best torrents of the groups
-// the entry lists only as alts, under the same tag, content and
-// obtainability filters.
+// alternatives is recommended's twin for the torrents SeaDex does not mark
+// best, under the same tag, content and obtainability filters. It goes by
+// SeaDex's per-torrent mark, not by group: one group can have both, such as
+// MrManager's unrestored (best) and restored (alt) remuxes of entry 2461.
 func (c *Comparer) alternatives(entry *seadex.Entry) []candidate {
-	best := map[string]bool{}
-	for i := range entry.Torrents {
-		if entry.Torrents[i].IsBest {
-			best[release.NormalizeGroup(classify.Torrent(entry, &entry.Torrents[i]).Group)] = true
-		}
-	}
 	var out []candidate
 	for i := range entry.Torrents {
 		t := &entry.Torrents[i]
@@ -40,7 +40,7 @@ func (c *Comparer) alternatives(entry *seadex.Entry) []candidate {
 			continue
 		}
 		rel := classify.Torrent(entry, t)
-		if best[release.NormalizeGroup(rel.Group)] || !filter.KeepNonTracker(&rel, c.opts) {
+		if !filter.KeepNonTracker(&rel, c.opts) {
 			continue
 		}
 		if !classify.Obtainable(&rel, t, c.animeBytes) {
@@ -75,7 +75,8 @@ func (c *Comparer) addAlt(m *match.Match, d *align.Decision, f *Finding) *Findin
 			own = append(own, pool[i])
 		}
 	}
-	f.Alt = AltRelease{Group: rep.rel.Group, Links: obtainableLinks(own, group)}
+	f.Alt = AltRelease{Group: rep.rel.Group, Links: obtainableLinks(own, group),
+		Kind: string(rep.rel.Kind), Resolution: rep.rel.Resolution, DualAudio: rep.rel.DualAudio}
 	if set, ok := downloadSet(own); ok {
 		if total, ok := downloadBytes(set); ok {
 			f.Alt.ReleaseBytes = total

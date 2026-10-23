@@ -1,6 +1,11 @@
 package notify
 
-import "github.com/cplieger/seadex-scout/internal/compare"
+import (
+	"strings"
+
+	"github.com/cplieger/seadex-scout/internal/compare"
+	"github.com/cplieger/seadex-scout/internal/release"
+)
 
 // altKVs renders an upgrade's headline alt release for the built-in
 // dashboard: its group, its links split the way the best release's are, and
@@ -15,6 +20,7 @@ func altKVs(f *compare.Finding) []any {
 	publicLink, abLink := trackerURLs(a.Links)
 	kvs := []any{
 		"alt_group", capAttr(a.Group),
+		"alt_seadex_tags", altTags(a),
 		"alt_nyaa_url", capURLAttr(publicLink.nyaaURL()),
 		"alt_public_url", capURLAttr(publicLink.otherURL()),
 		"alt_public_tracker", capAlertTextAttr(publicLink.otherTracker()),
@@ -50,11 +56,35 @@ func forkKVs(f *compare.Finding) []any {
 	if f.NoBestReason != "" {
 		kvs = append(kvs, "no_best_reason", f.NoBestReason)
 	}
+	if notes := strings.TrimSpace(f.Notes); notes != "" {
+		kvs = append(kvs, "seadex_notes", reboundTo(capAttr(notes), maxNotesBytes))
+	}
 	return append(kvs, altKVs(f)...)
+}
+
+// maxNotesBytes bounds the SeaDex notes a finding line carries: they ride
+// every line of every check, and the dashboard only shows them on hover.
+const maxNotesBytes = 1500
+
+// altTags is the alt's counterpart of seadexTags: "alt", then its kind,
+// resolution and dual audio.
+func altTags(a *compare.AltRelease) string {
+	tags := []string{"alt"}
+	if a.Kind != "" && a.Kind != string(release.KindUnknown) {
+		tags = append(tags, a.Kind)
+	}
+	if a.Resolution != "" {
+		tags = append(tags, a.Resolution)
+	}
+	if a.DualAudio {
+		tags = append(tags, "dual-audio")
+	}
+	return strings.Join(tags, " · ")
 }
 
 // boundRetainedAlt is boundRetained for the alt release's untrusted strings.
 func boundRetainedAlt(f *compare.Finding) {
+	f.Notes = reboundTo(capAttr(f.Notes), maxNotesBytes)
 	f.Alt.Group = capAttr(f.Alt.Group)
 	f.Alt.Links = capRetainedList(f.Alt.Links)
 	for i := range f.Alt.Links {

@@ -156,6 +156,9 @@ type Finding struct {
 	// ArrID is the item's id in its arr, for the dashboard to look up its
 	// monitored flags. Set in Extended mode only.
 	ArrID int
+	// Notes is the SeaDex entry's notes, the free text explaining its picks.
+	// Set in Extended mode only.
+	Notes string
 }
 
 // --- Comparison flow ---
