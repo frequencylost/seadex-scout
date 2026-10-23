@@ -36,6 +36,12 @@ const (
 	envNtfyUnmonitored = "SEADEX_SCOUT_NTFY_UNMONITORED"
 	envDashboardURL    = "SEADEX_SCOUT_DASHBOARD_URL"
 
+	envQbitURL            = "SEADEX_SCOUT_QBIT_URL"
+	envQbitUsername       = "SEADEX_SCOUT_QBIT_USERNAME"
+	envQbitPassword       = "SEADEX_SCOUT_QBIT_PASSWORD"
+	envQbitCategorySonarr = "SEADEX_SCOUT_QBIT_CATEGORY_SONARR"
+	envQbitCategoryRadarr = "SEADEX_SCOUT_QBIT_CATEGORY_RADARR"
+
 	defaultWebUIPort = "9119"
 	webUIStateFile   = "webui-state.json"
 	webUISaveEvery   = time.Minute
@@ -106,6 +112,7 @@ func (w *webUIRuntime) start(ctx context.Context, cfg *config.Config) func() {
 		Store:     w.store,
 		Runner:    runner,
 		Notifier:  notifier,
+		Qbit:      newQbit(log),
 		Log:       log,
 	})
 
@@ -200,4 +207,28 @@ func startNtfy(ctx context.Context, store *webui.Store, log *slog.Logger) *webui
 func envTrue(name string) bool {
 	v, _ := strconv.ParseBool(strings.TrimSpace(os.Getenv(name)))
 	return v
+}
+
+// newQbit sets up the Send to qBittorrent buttons when SEADEX_SCOUT_QBIT_URL
+// is set, or returns nil. A bad URL is logged and leaves them off.
+func newQbit(log *slog.Logger) *webui.Qbit {
+	addr := strings.TrimSpace(os.Getenv(envQbitURL))
+	if addr == "" {
+		return nil
+	}
+	q, err := webui.NewQbit(webui.QbitConfig{
+		URL:      addr,
+		Username: os.Getenv(envQbitUsername),
+		Password: os.Getenv(envQbitPassword),
+		Categories: map[string]string{
+			"sonarr": strings.TrimSpace(os.Getenv(envQbitCategorySonarr)),
+			"radarr": strings.TrimSpace(os.Getenv(envQbitCategoryRadarr)),
+		},
+	})
+	if err != nil {
+		log.Error("Send to qBittorrent is off", "env", envQbitURL, "error", err)
+		return nil
+	}
+	log.Info("Send to qBittorrent on")
+	return q
 }

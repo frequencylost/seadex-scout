@@ -85,6 +85,25 @@ The events:
 
 These follow the same conditions as upstream's alert rules (see [Monitoring and alerts](monitoring.md#alerting)), so you get the useful part of that setup from the container alone. The **Notifications** card on the Scout health tab shows where messages go, how many were sent and the last error, and has a **Send test** button.
 
+## Send to qBittorrent
+
+With `SEADEX_SCOUT_QBIT_URL` set, every Nyaa link in the tables gets a **→ qBittorrent** button underneath. It adds that release's `.torrent` to qBittorrent under the category set for Sonarr or Radarr, depending on which app the row belongs to. Use the categories your Sonarr and Radarr qBittorrent download clients use, so they pick the download up and import it as they would one of their own grabs.
+
+| Variable | Description | Default |
+| --- | --- | --- |
+| `SEADEX_SCOUT_QBIT_URL` | qBittorrent's Web UI address, such as `http://192.168.1.10:8080`. Empty hides the buttons. | _(unset)_ |
+| `SEADEX_SCOUT_QBIT_USERNAME`, `SEADEX_SCOUT_QBIT_PASSWORD` | The Web UI sign-in. Leave them empty if qBittorrent skips sign-in for local addresses. | _(unset)_ |
+| `SEADEX_SCOUT_QBIT_CATEGORY_SONARR` | The category for Sonarr rows. It is created if missing. | _(none)_ |
+| `SEADEX_SCOUT_QBIT_CATEGORY_RADARR` | The category for Radarr rows. It is created if missing. | _(none)_ |
+
+How it behaves:
+
+- The button sends the Nyaa link of the release shown, and qBittorrent downloads the `.torrent` from Nyaa itself.
+- When a SeaDex pick is a set of single-episode torrents rather than a season pack, the link, and so the button, is for one of them only.
+- The server only accepts `https://nyaa.si/view/<number>` links and only "sonarr" or "radarr" from the page, so the button can't be used to make qBittorrent fetch anything else.
+- Use the server's LAN address for qBittorrent. A Tailscale `*.ts.net` name does not resolve inside the container.
+- A button that has added its release shows **Added ✓** until the page is reloaded. A failure shows **Failed – retry**, with qBittorrent's reason on hover.
+
 ## Limits
 
 - The dashboard runs in daemon mode only. A container started with `mode: report` exits after its report and serves nothing.

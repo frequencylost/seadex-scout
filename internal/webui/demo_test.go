@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"testing"
@@ -128,7 +129,16 @@ func TestDemo(t *testing.T) {
 	}
 	// Vinland Saga's season 2 and Your Name. are unmonitored.
 	store.setMonitored([]string{"sonarr:11:2", "radarr:13"}, "")
-	srv := NewServer(Options{Addr: addr, ReportDir: dir, Store: store, Log: slog.Default()})
+	// A stand-in qBittorrent that accepts everything.
+	fakeQbit := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		_, _ = w.Write([]byte("Ok."))
+	}))
+	defer fakeQbit.Close()
+	qbit, err := NewQbit(QbitConfig{URL: fakeQbit.URL, Categories: map[string]string{"sonarr": "tv-sonarr", "radarr": "radarr"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	srv := NewServer(Options{Addr: addr, ReportDir: dir, Store: store, Qbit: qbit, Log: slog.Default()})
 	t.Logf("demo dashboard on http://%s", addr)
 	if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 		t.Fatal(err)

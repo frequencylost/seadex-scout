@@ -166,6 +166,9 @@ The settings most people change:
 | `SEADEX_SCOUT_NTFY_EVENTS` | What to send: `upgrades`, `problems`, `errors`, `reports`. | all four |
 | `SEADEX_SCOUT_NTFY_OPTIONAL` / `SEADEX_SCOUT_NTFY_UNMONITORED` | `true` also sends optional upgrades or unmonitored entries. | `false` |
 | `SEADEX_SCOUT_DASHBOARD_URL` | The dashboard's address, for a Dashboard button on each notification. | _(unset)_ |
+| `SEADEX_SCOUT_QBIT_URL` | qBittorrent's Web UI address, for a Send to qBittorrent button under each Nyaa link. | _(unset)_ |
+| `SEADEX_SCOUT_QBIT_USERNAME`, `SEADEX_SCOUT_QBIT_PASSWORD` | The qBittorrent Web UI sign-in. | _(unset)_ |
+| `SEADEX_SCOUT_QBIT_CATEGORY_SONARR`, `SEADEX_SCOUT_QBIT_CATEGORY_RADARR` | The category each app's releases are added under. | _(none)_ |
 
 ## Security
 

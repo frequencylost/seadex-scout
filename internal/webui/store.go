@@ -405,6 +405,7 @@ type Snapshot struct {
 	ReportJob ReportJob    `json:"report_job"`
 	Monitored Monitored    `json:"monitored"`
 	Notify    NotifyStatus `json:"notify"`
+	Qbit      QbitStatus   `json:"qbit"`
 	state
 }
 

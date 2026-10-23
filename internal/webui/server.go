@@ -33,7 +33,9 @@ type Options struct {
 	Runner    *ReportRunner
 	// Notifier sends the dashboard's test notification; nil when ntfy is off.
 	Notifier interface{ SendTest(context.Context) error }
-	Log      *slog.Logger
+	// Qbit sends releases to qBittorrent; nil when it is not set up.
+	Qbit *Qbit
+	Log  *slog.Logger
 }
 
 // NewServer returns the dashboard's HTTP server, not yet listening.
@@ -57,7 +59,11 @@ func NewServer(o Options) *http.Server {
 		files.ServeHTTP(w, r)
 	})
 	app.HandleFunc("GET /api/state", func(w http.ResponseWriter, _ *http.Request) {
-		writeJSON(w, o.Store.Snapshot())
+		snap := o.Store.Snapshot()
+		if o.Qbit != nil {
+			snap.Qbit = o.Qbit.Status()
+		}
+		writeJSON(w, snap)
 	})
 	app.HandleFunc("GET /api/logs", func(w http.ResponseWriter, _ *http.Request) {
 		writeJSON(w, o.Store.Logs())
@@ -115,6 +121,32 @@ func NewServer(o Options) *http.Server {
 		o.Log.Info("report started from the dashboard")
 		w.WriteHeader(http.StatusAccepted)
 		writeJSON(w, o.Store.reportJob())
+	})
+	app.HandleFunc("POST /api/qbit/add", func(w http.ResponseWriter, r *http.Request) {
+		if r.Header.Get(csrfHeader) == "" {
+			http.Error(w, "missing "+csrfHeader+" header", http.StatusForbidden)
+			return
+		}
+		if o.Qbit == nil {
+			http.Error(w, "qBittorrent is not set up: set SEADEX_SCOUT_QBIT_URL", http.StatusNotImplemented)
+			return
+		}
+		var in struct {
+			URL string `json:"url"`
+			Arr string `json:"arr"`
+		}
+		if err := json.NewDecoder(io.LimitReader(r.Body, 4096)).Decode(&in); err != nil {
+			http.Error(w, "bad request", http.StatusBadRequest)
+			return
+		}
+		category, err := o.Qbit.AddNyaa(r.Context(), in.URL, in.Arr)
+		if err != nil {
+			o.Log.Warn("could not send a release to qBittorrent", "error", err)
+			http.Error(w, err.Error(), http.StatusBadGateway)
+			return
+		}
+		o.Log.Info("release sent to qBittorrent", "url", in.URL, "category", category)
+		writeJSON(w, map[string]string{"category": category})
 	})
 	app.HandleFunc("POST /api/notify/test", func(w http.ResponseWriter, r *http.Request) {
 		if r.Header.Get(csrfHeader) == "" {

@@ -12,6 +12,7 @@ const state = {
   snap: null,
   tab: "overview",
   sorts: { upgrades: null, atbest: null },
+  qbitSent: new Map(), // Nyaa URL -> category, so a redraw keeps "Added"
   report: null,
   reportVerdict: "",
 };
@@ -555,10 +556,10 @@ function findingRow(f, now) {
     el("td", { text: a.status === "not_downloaded" ? "–" : groupWithRevision(a.current_group, newer ? a.current_revision : "") }),
     best,
     a.recommended_group ? sizeCell(a.recommended_bytes, changeOf(a, ""), isApprox(a, "")) : el("td", { class: "num", text: "–" }),
-    el("td", {}, el("div", { class: "links" }, bestLinks)),
+    linkCell(a, bestLinks, a.nyaa_url),
     altCell(a, entry),
     a.alt_group ? sizeCell(a.alt_recommended_bytes, changeOf(a, "alt_"), isApprox(a, "alt_")) : el("td", { class: "num", text: "–" }),
-    el("td", {}, el("div", { class: "links" }, releaseLinks(a, "alt_"))),
+    linkCell(a, releaseLinks(a, "alt_"), a.alt_nyaa_url),
     el("td", { class: "num", text: a.first_seen ? ago(num(a.first_seen), now) : "–" }));
 }
 
@@ -575,6 +576,48 @@ function noBestDetail(a) {
     case "theoretical": case "theoretical_best": return "SeaDex names a theoretical best only";
     case "incomplete": return "SeaDex entry incomplete";
     default: return "its best is filtered out or on a tracker you have off";
+  }
+}
+
+// linkCell is a release's links with, under a Nyaa link, a button that sends
+// the release to qBittorrent when that is set up.
+function linkCell(a, links, nyaaURL) {
+  const qbit = state.snap && state.snap.qbit;
+  const td = el("td", {}, el("div", { class: "links" }, links));
+  if (qbit && qbit.enabled && nyaaURL && (a.arr === "sonarr" || a.arr === "radarr")) {
+    const category = (qbit.categories || {})[a.arr];
+    const btn = el("button", { type: "button", class: "qbit-btn", title: `Add this Nyaa release to qBittorrent${category ? ` under the category ${category}` : ""}` }, "→ qBittorrent");
+    if (state.qbitSent.has(nyaaURL)) {
+      btn.textContent = "Added ✓";
+      btn.classList.add("done");
+      btn.disabled = true;
+    }
+    btn.addEventListener("click", () => sendToQbit(btn, nyaaURL, a.arr));
+    td.append(btn);
+  }
+  return td;
+}
+
+async function sendToQbit(btn, url, arr) {
+  btn.disabled = true;
+  btn.textContent = "Sending…";
+  try {
+    const res = await fetch("api/qbit/add", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "X-Seadex-Scout": "1" },
+      body: JSON.stringify({ url, arr }),
+    });
+    if (!res.ok) throw new Error((await res.text()).trim());
+    const out = await res.json();
+    state.qbitSent.set(url, out.category || "");
+    btn.textContent = "Added ✓";
+    btn.classList.add("done");
+    btn.title = out.category ? `Added under ${out.category}` : "Added";
+  } catch (err) {
+    btn.textContent = "Failed – retry";
+    btn.classList.add("failed");
+    btn.title = err.message;
+    btn.disabled = false;
   }
 }
 

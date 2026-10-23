@@ -275,6 +275,17 @@ td.empty, p.empty { color: var(--muted); text-align: center; padding: 18px; }
   font-size: 12px;
   white-space: nowrap;
 }
+.qbit-btn {
+  display: block;
+  margin-top: 4px;
+  padding: 1px 8px;
+  font-size: 11.5px;
+  border-radius: 6px;
+  white-space: nowrap;
+  color: var(--accent);
+}
+.qbit-btn.done { color: var(--good); border-color: var(--good); }
+.qbit-btn.failed { color: var(--bad); border-color: var(--bad); }
 .tag { display: inline-block; padding: 1px 8px; border-radius: 6px; font-size: 12px; white-space: nowrap; background: var(--surface-2); }
 .tag.good { background: var(--good-bg); color: var(--good); }
 .tag.warn { background: var(--warn-bg); color: var(--warn); }
