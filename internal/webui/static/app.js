@@ -546,7 +546,64 @@ function renderFindings(table, list, now, emptyText) {
     });
     return th;
   })));
-  setRows(tbl.tBodies[0], rows.map((f) => findingRow(f, now)), FINDING_COLUMNS.length, emptyText);
+  setRows(tbl.tBodies[0], rows.flatMap((f) => findingRows(f, now)), FINDING_COLUMNS.length, emptyText);
+}
+
+// findingRows is a finding's row, then one sub-row per further SeaDex best
+// or alt release, filling only the best and alt columns.
+function findingRows(f, now) {
+  const a = f.attrs;
+  const bests = parseOptions(a.best_options);
+  const alts = parseOptions(a.alt_options);
+  const row = findingRow(f, now);
+  const n = Math.max(bests.length, alts.length);
+  if (!n) return [row];
+  row.classList.add("has-subs");
+  const entry = a.al_id ? SEADEX + a.al_id + "/" : "";
+  const subs = [];
+  for (let i = 0; i < n; i++) {
+    const tr = el("tr", { class: "sub-row" + (i === n - 1 ? " last-sub" : "") },
+      el("td", {}), el("td", {}), el("td", {}), el("td", {}),
+      ...optionCells(a, bests[i], entry, "best"),
+      ...optionCells(a, alts[i], entry, "alt"),
+      el("td", {}));
+    subs.push(tr);
+  }
+  return [row, ...subs];
+}
+
+// parseOptions reads a best_options or alt_options list, leaving out the
+// headline release the row itself already shows.
+function parseOptions(raw) {
+  if (typeof raw !== "string" || !raw) return [];
+  try {
+    const list = JSON.parse(raw);
+    return Array.isArray(list) ? list.filter((o) => o && !o.headline) : [];
+  } catch {
+    return [];
+  }
+}
+
+// optionCells is a release's three cells: name and info line, size and
+// change, and its links with the → qBit and → Prowlarr buttons.
+function optionCells(a, o, entry, rung) {
+  if (!o) return [el("td", {}), el("td", {}), el("td", {})];
+  const links = [];
+  if (o.nyaa_url) links.push(link(o.nyaa_url, "Nyaa"));
+  if (o.public_url) links.push(link(o.public_url, o.public_tracker || "Tracker"));
+  if (o.ab_url) links.push(link(o.ab_url, o.ab_tracker || "AnimeBytes"));
+  const bytes = num(o.bytes);
+  let change = num(o.change);
+  let approx = false;
+  if (change === null && bytes !== null) {
+    if (a.status === "not_downloaded") change = bytes;
+    else if (num(a.library_bytes) > 0) { change = bytes - num(a.library_bytes); approx = true; }
+  }
+  return [
+    el("td", {}, withNotes(link(entry, o.group || "?"), a), o.tags ? el("span", { class: "sub", text: o.tags }) : null),
+    bytes !== null ? sizeCell(bytes, change, approx) : el("td", { class: "num", text: "–" }),
+    linkCell(a, links, o.nyaa_url),
+  ];
 }
 
 function findingRow(f, now) {
@@ -799,7 +856,10 @@ function withNotes(node, a) {
 function altCell(a, entry) {
   const all = typeof a.alt_groups === "string" && a.alt_groups ? a.alt_groups.split(",") : [];
   if (!a.alt_group) return el("td", { text: all.join(", ") || "–" });
-  const others = all.filter((g) => g.toLowerCase() !== a.alt_group.toLowerCase());
+  // Other alts SeaDex lists show as their own sub-rows when they can be got;
+  // only the names of ones that cannot are left here.
+  const shown = new Set(parseOptions(a.alt_options).map((o) => (o.group || "").toLowerCase()));
+  const others = all.filter((g) => g.toLowerCase() !== a.alt_group.toLowerCase() && !shown.has(g.toLowerCase()));
   const sameGroup = (a.recommended_group || "").toLowerCase() === a.alt_group.toLowerCase();
   return el("td", {}, withNotes(link(entry, a.alt_group), a),
     a.alt_seadex_tags ? el("span", { class: "sub", text: a.alt_seadex_tags }) : null,

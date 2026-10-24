@@ -37,3 +37,19 @@ func TestForkKVsCarryAltTagsAndNotes(t *testing.T) {
 		t.Error("an entry without notes logs seadex_notes")
 	}
 }
+
+func TestOptionsAttrOnlyWithMoreThanTheHeadline(t *testing.T) {
+	one := []compare.ReleaseOption{{Group: "Okay-Subs", Headline: true}}
+	if got := optionsAttr(one, "best"); got != "" {
+		t.Errorf("headline only: %q, want nothing", got)
+	}
+	two := append(one, compare.ReleaseOption{Group: "Beatrice-Raws", Kind: "remux", Resolution: "1080p", DualAudio: true,
+		Links: []compare.ReleaseLink{{Tracker: "Nyaa", URL: "https://nyaa.si/view/5"}}, ReleaseBytes: 10, CurrentBytes: 4})
+	got := optionsAttr(two, "best")
+	for _, want := range []string{`"group":"Beatrice-Raws"`, `"tags":"best · remux · 1080p · dual-audio"`,
+		`"nyaa_url":"https://nyaa.si/view/5"`, `"bytes":10`, `"change":6`, `"headline":true`} {
+		if !strings.Contains(got, want) {
+			t.Errorf("optionsAttr = %s, lacks %s", got, want)
+		}
+	}
+}

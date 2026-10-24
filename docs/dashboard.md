@@ -36,7 +36,8 @@ Its state goes in `webui-state.json` beside `config.yaml`, saved every minute an
   Both tables have the same columns:
   - **On disk:** the size of the files Sonarr or Radarr holds.
   - SeaDex's best and its headline alt each get a **Size / change** column and a **Link** column, Nyaa first. The size is the download, and the change below it is how much your library grows or shrinks if you take it.
-  - Both group names link to the show's SeaDex page. Any other alt groups SeaDex lists appear under the alt's name.
+  - Both group names link to the show's SeaDex page.
+  - When SeaDex lists more than one best or alt release, each further one gets a sub-row directly under the row, in the SeaDex best or SeaDex alt columns. It has its own name, info line (such as `best · remux · 1080p · dual-audio`), size and change, and Nyaa, → qBit and → Prowlarr buttons. The same release posted on Nyaa and AnimeBytes counts as one, with both links. Up to 6 bests and 6 alts are shown per entry. Alt groups with no release you can get, such as AnimeBytes-only ones with `animebytes` off, are still named under the alt as "also …".
   - An incomplete SeaDex entry with a best still lists as an upgrade, marked "SeaDex entry incomplete".
   - A size change is worked out by matching each episode the download holds to the file Sonarr has for it, then subtracting the files it would replace. When the files can't be matched one by one, for example because of a naming style the scout can't read, a release that covers more or fewer episodes than you have, or a season Sonarr numbers differently, the change falls back to the download minus the **On disk** size. That fallback is marked **≈**.
 

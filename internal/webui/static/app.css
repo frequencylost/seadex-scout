@@ -293,6 +293,12 @@ table.findings th:nth-child(11), table.findings td:nth-child(11) {
   padding-left: 14px;
 }
 
+/* Further SeaDex releases sit in sub-rows under their finding. */
+table.data tr.has-subs td, table.data tr.sub-row td { border-bottom: none; }
+table.data tr.sub-row td { padding-top: 2px; }
+table.data tr.sub-row.last-sub td { border-bottom: 1px solid var(--border); }
+table.data tr.sub-row:hover, table.data tr.has-subs:hover { background: none; }
+
 .qbit-btn {
   display: block;
   margin-top: 4px;

@@ -154,3 +154,42 @@ func TestBareEpisodeNumbersReadPerSeason(t *testing.T) {
 		t.Fatalf("Compare = %+v, want the alt replacing season 2 (%d)", got, 12*heldBytes)
 	}
 }
+
+// TestReleaseOptionsListEveryRelease pins Finding.BestOptions and AltOptions:
+// one option per distinct release, the same release on two trackers merged,
+// the headline first and marked.
+func TestReleaseOptionsListEveryRelease(t *testing.T) {
+	second := pack(1, 12, 2)
+	second.ReleaseGroup = "Beatrice-Raws"
+	for i := range second.Files {
+		second.Files[i].Name = fmt.Sprintf("[Beatrice-Raws] Show - S01E%02d (BDRip 1920x1080 HEVC FLAC).mkv", i+1)
+	}
+	abCopy := pack(1, 12, 3)
+	abCopy.Tracker, abCopy.URL, abCopy.InfoHash = "AB", "/torrents.php?id=1&torrentid=2", ""
+	entry := seadex.Entry{AniListID: 1, Torrents: []seadex.Torrent{pack(1, 12, 1), second, abCopy,
+		altPack("Judas", 12, 1, gib/2), altPack("Vodes", 12, 2, gib/4)}}
+	m := match.Match{Item: sizedSeries(), Arr: library.ArrSonarr, Entry: entry, Record: mapping.Record{SeasonTvdb: 1}}
+	got := New(Config{Extended: true, AnimeBytes: true}).Compare([]match.Match{m})
+	if len(got) != 1 {
+		t.Fatalf("Compare = %+v", got)
+	}
+	f := got[0]
+	if len(f.BestOptions) != 2 || !f.BestOptions[0].Headline || f.BestOptions[0].Group != f.RecommendedGroup || f.BestOptions[1].Headline {
+		t.Fatalf("BestOptions = %+v, want the headline then one other", f.BestOptions)
+	}
+	var subs *ReleaseOption
+	for i := range f.BestOptions {
+		if f.BestOptions[i].Group == "SubsPlease" {
+			subs = &f.BestOptions[i]
+		}
+	}
+	if subs == nil || len(subs.Links) != 2 || subs.ReleaseBytes != 12*newBytes {
+		t.Errorf("SubsPlease option = %+v, want its Nyaa and AnimeBytes copies as one release", subs)
+	}
+	if len(f.AltOptions) != 2 || !f.AltOptions[0].Headline || f.AltOptions[0].Group != f.Alt.Group {
+		t.Errorf("AltOptions = %+v, want the headline alt first", f.AltOptions)
+	}
+	if got := New(Config{}).Compare([]match.Match{m}); len(got) != 1 || got[0].BestOptions != nil {
+		t.Errorf("without Extended: %+v", got)
+	}
+}

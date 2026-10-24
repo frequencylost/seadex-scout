@@ -136,7 +136,12 @@ func (c *Comparer) enrich(m *match.Match, d *align.Decision, pool []candidate, f
 			}
 		}
 	}
-	return c.addAlt(m, d, f)
+	f = c.addAlt(m, d, f)
+	f.BestOptions = c.releaseOptions(m, d, c.recommended(&m.Entry),
+		optionKey{release.NormalizeGroup(f.RecommendedGroup), f.Kind, f.Resolution, f.DualAudio})
+	f.AltOptions = c.releaseOptions(m, d, c.alternatives(&m.Entry),
+		optionKey{release.NormalizeGroup(f.Alt.Group), f.Alt.Kind, f.Alt.Resolution, f.Alt.DualAudio})
+	return f
 }
 
 // libraryBytes is the size of the files the decided unit holds: a movie's

@@ -1,6 +1,7 @@
 package notify
 
 import (
+	"encoding/json"
 	"strings"
 
 	"github.com/cplieger/seadex-scout/internal/compare"
@@ -59,17 +60,72 @@ func forkKVs(f *compare.Finding) []any {
 	if notes := strings.TrimSpace(f.Notes); notes != "" {
 		kvs = append(kvs, "seadex_notes", reboundTo(capAttr(notes), maxNotesBytes))
 	}
-	return append(kvs, altKVs(f)...)
+	kvs = append(kvs, altKVs(f)...)
+	if opts := optionsAttr(f.BestOptions, "best"); opts != "" {
+		kvs = append(kvs, "best_options", opts)
+	}
+	if opts := optionsAttr(f.AltOptions, "alt"); opts != "" {
+		kvs = append(kvs, "alt_options", opts)
+	}
+	return kvs
 }
 
-// maxNotesBytes bounds the SeaDex notes a finding line carries: they ride
-// every line of every check, and the dashboard only shows them on hover.
-const maxNotesBytes = 1500
+// optionJSON is one release in best_options or alt_options, as the
+// dashboard reads it.
+type optionJSON struct {
+	Group         string `json:"group"`
+	Tags          string `json:"tags"`
+	NyaaURL       string `json:"nyaa_url,omitempty"`
+	PublicURL     string `json:"public_url,omitempty"`
+	PublicTracker string `json:"public_tracker,omitempty"`
+	ABURL         string `json:"ab_url,omitempty"`
+	ABTracker     string `json:"ab_tracker,omitempty"`
+	Bytes         int64  `json:"bytes,omitempty"`
+	Change        *int64 `json:"change,omitempty"`
+	Headline      bool   `json:"headline,omitempty"`
+}
 
-// altTags is the alt's counterpart of seadexTags: "alt", then its kind,
-// resolution and dual audio.
-func altTags(a *compare.AltRelease) string {
-	tags := []string{"alt"}
+// optionsAttr renders a finding's releases as a JSON list for the dashboard,
+// or "" when there is nothing past the headline the row already shows.
+func optionsAttr(opts []compare.ReleaseOption, rung string) string {
+	extra := false
+	for i := range opts {
+		extra = extra || !opts[i].Headline
+	}
+	if !extra {
+		return ""
+	}
+	out := make([]optionJSON, 0, len(opts))
+	for i := range opts {
+		o := &opts[i]
+		publicLink, abLink := trackerURLs(o.Links)
+		j := optionJSON{
+			Group: capAttr(o.Group), Tags: releaseTags(rung, o),
+			NyaaURL: capURLAttr(publicLink.nyaaURL()), PublicURL: capURLAttr(publicLink.otherURL()),
+			PublicTracker: capAlertTextAttr(publicLink.otherTracker()),
+			ABURL:         capURLAttr(abLink.url), ABTracker: capAlertTextAttr(abLink.abTracker()),
+			Headline: o.Headline,
+		}
+		if o.ReleaseBytes > 0 {
+			j.Bytes = o.ReleaseBytes
+			if o.CurrentBytes > 0 {
+				change := o.ReleaseBytes - o.CurrentBytes
+				j.Change = &change
+			}
+		}
+		out = append(out, j)
+	}
+	raw, err := json.Marshal(out)
+	if err != nil {
+		return ""
+	}
+	return string(raw)
+}
+
+// releaseTags is an option's info line: its rung, kind, resolution and
+// dual audio, as altTags renders the headline alt's.
+func releaseTags(rung string, a *compare.AltRelease) string {
+	tags := []string{rung}
 	if a.Kind != "" && a.Kind != string(release.KindUnknown) {
 		tags = append(tags, a.Kind)
 	}
@@ -82,8 +138,29 @@ func altTags(a *compare.AltRelease) string {
 	return strings.Join(tags, " · ")
 }
 
-// boundRetainedAlt is boundRetained for the alt release's untrusted strings.
+// maxNotesBytes bounds the SeaDex notes a finding line carries: they ride
+// every line of every check, and the dashboard only shows them on hover.
+const maxNotesBytes = 1500
+
+// altTags is the alt's counterpart of seadexTags: "alt", then its kind,
+// resolution and dual audio.
+func altTags(a *compare.AltRelease) string { return releaseTags("alt", a) }
+
+// boundRetainedAlt is boundRetained for the alt release's and the release
+// options' untrusted strings.
 func boundRetainedAlt(f *compare.Finding) {
+	for _, opts := range []*[]compare.ReleaseOption{&f.BestOptions, &f.AltOptions} {
+		*opts = capRetainedList(*opts)
+		for i := range *opts {
+			o := &(*opts)[i]
+			o.Group = capAttr(o.Group)
+			o.Links = capRetainedList(o.Links)
+			for j := range o.Links {
+				o.Links[j].Tracker = capRetainedElem(o.Links[j].Tracker)
+				o.Links[j].URL = capRetainedElem(o.Links[j].URL)
+			}
+		}
+	}
 	f.Notes = reboundTo(capAttr(f.Notes), maxNotesBytes)
 	f.Alt.Group = capAttr(f.Alt.Group)
 	f.Alt.Links = capRetainedList(f.Alt.Links)

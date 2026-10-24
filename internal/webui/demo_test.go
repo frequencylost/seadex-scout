@@ -86,6 +86,14 @@ func TestDemo(t *testing.T) {
 				}
 			}
 		}
+		if i == 0 {
+			kvs = append(kvs,
+				"best_options", `[{"group":"Okay-Subs","tags":"best · encode · 1080p · dual-audio","headline":true},`+
+					`{"group":"Beatrice-Raws","tags":"best · remux · 1080p · dual-audio","nyaa_url":"https://nyaa.si/view/1900001","bytes":56371445760,"change":38117834752}]`,
+				"alt_options", `[{"group":"Vodes","tags":"alt · encode · 1080p · dual-audio","headline":true},`+
+					`{"group":"Judas","tags":"alt · encode · 1080p","nyaa_url":"https://nyaa.si/view/1900002","bytes":9771050598},`+
+					`{"group":"LostYears","tags":"alt · encode · 1080p · dual-audio","nyaa_url":"https://nyaa.si/view/1900003","bytes":14495514624,"change":-3758096384}]`)
+		}
 		log.Warn("better release available", kvs...)
 	}
 	log.Info("series spans multiple release groups, manual review", "title", "Cowboy Bebop", "al_id", 1,

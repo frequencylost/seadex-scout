@@ -26,7 +26,13 @@ type AltRelease struct {
 	Kind       string
 	Resolution string
 	DualAudio  bool
+	// Headline marks, in Finding.BestOptions and AltOptions, the release the
+	// row already shows (the best's own fields, or Alt).
+	Headline bool
 }
+
+// ReleaseOption is one release in Finding.BestOptions or AltOptions.
+type ReleaseOption = AltRelease
 
 // alternatives is recommended's twin for the torrents SeaDex does not mark
 // best, under the same tag, content and obtainability filters. It goes by

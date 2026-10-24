@@ -159,6 +159,11 @@ type Finding struct {
 	// Notes is the SeaDex entry's notes, the free text explaining its picks.
 	// Set in Extended mode only.
 	Notes string
+	// BestOptions and AltOptions are every best and alt release the operator
+	// can obtain, one per distinct release, headline first, at most
+	// maxReleaseOptions each. Set in Extended mode only (options.go).
+	BestOptions []ReleaseOption
+	AltOptions  []ReleaseOption
 }
 
 // --- Comparison flow ---
