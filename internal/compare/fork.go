@@ -241,3 +241,41 @@ func lastMatch(re *regexp.Regexp, s string) []string {
 	}
 	return all[len(all)-1]
 }
+
+// settleUnverifiable decides, in Extended mode, a comparison upstream leaves
+// undecided because unknown group evidence on one side could hide a match:
+// most often a SeaDex release with no group (NOGRP). Groups the operator
+// holds that SeaDex names are still evidence: when every held group is a
+// named best group, the unit is at SeaDex's best, and when every one is a
+// named alt group, it is held at an alt, an optional upgrade like any other.
+// An untagged unit on the operator's side stays undecided.
+func (c *Comparer) settleUnverifiable(d *align.Decision, recGroups []string, f *Finding) *Finding {
+	if !c.extended || f == nil {
+		return f
+	}
+	if heldNamed(d.Groups, recGroups) {
+		f.Status = StatusAtBest
+		return f
+	}
+	if heldNamed(d.Groups, f.AltGroups) {
+		f.Tier = TierAlt
+	}
+	return f
+}
+
+// heldNamed reports whether the unit holds files and every group of them is
+// one of groups, by name: an untagged group (NOGRP) on either side matches
+// nothing, since it names no release.
+func heldNamed(held, groups []string) bool {
+	if len(held) == 0 {
+		return false
+	}
+	nogrp := release.NormalizeGroup(release.NoGroup)
+	for _, g := range held {
+		n := release.NormalizeGroup(g)
+		if n == nogrp || !slices.Contains(groups, n) {
+			return false
+		}
+	}
+	return true
+}

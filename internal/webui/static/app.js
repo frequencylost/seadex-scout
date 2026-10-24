@@ -355,6 +355,9 @@ function kindOf(f) {
   if (a.status === "at_best") return "atbest";
   if (NO_BEST.has(a.status)) return a.current_tier === "alt" ? "atbest" : "nobest";
   if (UPGRADE.has(a.status)) return "upgrade";
+  // An undecided row whose group is a named SeaDex alt is held at that alt:
+  // an optional upgrade, like a better_release held at an alt.
+  if (a.status === "unverifiable" && a.current_tier === "alt") return "upgrade";
   if (GROUPS.has(a.status)) return "groups";
   if (a.status === "not_downloaded") return "missing";
   return "other";
@@ -368,7 +371,13 @@ function whyOf(a) {
     case "better_release": return a.current_tier === "alt"
       ? { text: "SeaDex alt", cls: "good" } : { text: "Neither best nor alt", cls: "warn" };
     case "mixed_group_manual": return { text: "Several release groups", cls: "" };
-    case "unverifiable": return { text: "Group could not be read", cls: "" };
+    case "unverifiable": {
+      if (a.current_tier === "alt") return { text: "SeaDex alt", cls: "good" };
+      const yours = (a.current_group || "").trim().toLowerCase();
+      if (!yours || yours === "nogrp") return { text: "Your group can't be read", cls: "" };
+      if ((a.recommended_group || "").trim().toLowerCase() === "nogrp") return { text: "SeaDex best has no group", cls: "" };
+      return { text: "Group could not be read", cls: "" };
+    }
     case "not_downloaded": return { text: "Not downloaded", cls: "bad" };
     case "at_best": return { text: "At SeaDex best", cls: "good" };
     default: return a.current_tier === "alt"
@@ -388,7 +397,7 @@ function renderOverview(snap) {
   const m = snap.monitored || {};
   $("unmonitored-note").textContent = m.error && !m.at ? "Could not read monitored flags from Sonarr or Radarr"
     : !showUnmonitored && hidden ? `${hidden} unmonitored hidden` : "";
-  const isOptional = (f) => f.attrs.status === "better_release" && f.attrs.current_tier === "alt";
+  const isOptional = (f) => (f.attrs.status === "better_release" || f.attrs.status === "unverifiable") && f.attrs.current_tier === "alt";
   const todo = rows.filter((f) => kindOf(f) !== "atbest" && (showOptional || !isOptional(f)));
   const atBest = rows.filter((f) => kindOf(f) === "atbest");
 

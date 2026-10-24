@@ -29,7 +29,8 @@ Its state goes in `webui-state.json` beside `config.yaml`, saved every minute an
   - **Upgrades available** lists everything with something to do. The **Why** column says what:
     - Upgrades come first: **Newer version** of your group, **Neither best nor alt**, and optionally **SeaDex alt**.
     - Then **Not downloaded**: seasons and films Sonarr or Radarr has, with no file yet, that SeaDex has an entry for.
-    - Then the release groups that need a look: **Several release groups** and **Group could not be read**.
+    - Then the release groups that need a look: **Several release groups**, and undecided comparisons. Those say which side has no group: **Your group can't be read** (your files name none) or **SeaDex best has no group** (SeaDex's best is an untagged NOGRP release).
+    - The original app leaves a comparison undecided when either side has no group. This fork still decides it when your group is one SeaDex names. If it's a named best group, the row is at SeaDex best. If it's a named alt group, the row is a **SeaDex alt** optional upgrade, as with Space Brothers' Dekinai against an untagged best.
     - Then **No SeaDex best**: entries where SeaDex names only a theoretical best, the entry is incomplete, or the best is filtered out or on a tracker you have turned off. The SeaDex best column says which, and the alt still shows.
   - **Already on a SeaDex pick** lists what you hold at SeaDex's best, or at an alt where SeaDex names no best. A negative alt size change there is disk space the alt would save.
 

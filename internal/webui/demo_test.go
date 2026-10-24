@@ -105,6 +105,15 @@ func TestDemo(t *testing.T) {
 		"recommended_group", "MTBB", "nyaa_url", "https://nyaa.si/view/47", "recommended_bytes", int64(60<<30),
 		"size_change_bytes", int64(25<<30), "library_bytes", int64(35<<30), "alt_groups", "", "pass_id", pass,
 		"first_seen", pass, "rank_check", 1)
+	log.Info("release group unverifiable, manual review", "title", "Space Brothers", "al_id", 12431, "arr", "sonarr",
+		"arr_id", 30, "scope", "season", "season", 1, "status", "unverifiable", "current_group", "dekinai", "current_tier", "alt",
+		"recommended_group", "NOGRP", "seadex_tags", "unverifiable · remux · 1080p", "recommended_bytes", int64(633<<30),
+		"alt_group", "Dekinai", "alt_seadex_tags", "alt · remux", "alt_recommended_bytes", int64(65<<30),
+		"library_bytes", int64(64<<30), "pass_id", pass, "first_seen", pass, "rank_check", 2)
+	log.Info("release group unverifiable, manual review", "title", "Monster", "al_id", 19, "arr", "sonarr",
+		"arr_id", 31, "scope", "season", "season", 1, "status", "unverifiable", "current_group", "Judas",
+		"recommended_group", "NOGRP", "seadex_tags", "unverifiable · encode · 1080p", "library_bytes", int64(40<<30),
+		"pass_id", pass, "first_seen", pass, "rank_check", 3)
 	log.Info("SeaDex lists a theoretical best only", "title", "One Piece", "al_id", 21, "arr", "sonarr",
 		"season", 1, "status", "theoretical_best", "no_best_reason", "theoretical", "current_group", "Erai-raws",
 		"alt_group", "Judas", "alt_groups", "judas", "alt_nyaa_url", "https://nyaa.si/view/42",

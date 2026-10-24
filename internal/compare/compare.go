@@ -281,7 +281,8 @@ func (c *Comparer) compareOne(m *match.Match) *Finding {
 		return c.enrich(m, &d, nil, sized(m, &d, pool, f))
 	case align.OutcomeUnverifiable:
 		fillBest(&base, recommended, recGroups)
-		return c.enrich(m, &d, recommended, finalize(&base, StatusUnverifiable))
+		f := c.settleUnverifiable(&d, recGroups, finalize(&base, StatusUnverifiable))
+		return c.enrich(m, &d, recommended, f)
 	case align.OutcomeMixed:
 		fillBest(&base, recommended, recGroups)
 		return c.enrich(m, &d, recommended, finalize(&base, StatusMixedGroup))

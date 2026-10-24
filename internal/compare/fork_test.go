@@ -7,6 +7,7 @@ import (
 	"github.com/cplieger/seadex-scout/internal/library"
 	"github.com/cplieger/seadex-scout/internal/mapping"
 	"github.com/cplieger/seadex-scout/internal/match"
+	"github.com/cplieger/seadex-scout/internal/release"
 	"github.com/cplieger/seadex-scout/internal/seadex"
 )
 
@@ -191,5 +192,35 @@ func TestReleaseOptionsListEveryRelease(t *testing.T) {
 	}
 	if got := New(Config{}).Compare([]match.Match{m}); len(got) != 1 || got[0].BestOptions != nil {
 		t.Errorf("without Extended: %+v", got)
+	}
+}
+
+// TestUnverifiableSettledByNamedGroups pins settleUnverifiable on the case
+// seen on Space Brothers: SeaDex's best names no group (NOGRP), and the
+// operator holds the group SeaDex lists as the alt.
+func TestUnverifiableSettledByNamedGroups(t *testing.T) {
+	nogrpBest := pack(1, 12, 1)
+	nogrpBest.ReleaseGroup = "NOGRP"
+	for i := range nogrpBest.Files {
+		nogrpBest.Files[i].Name = fmt.Sprintf("Show S01/Show - S01E%02d (BD Remux 1080p).mkv", i+1)
+	}
+	alt := altPack("Dekinai", 12, 1, gib)
+	entry := seadex.Entry{AniListID: 1, Torrents: []seadex.Torrent{nogrpBest, alt}}
+
+	got := extendedOne(t, heldSeries("dekinai"), entry)
+	if len(got) != 1 || got[0].Status != StatusUnverifiable || got[0].Tier != TierAlt {
+		t.Fatalf("held alt: %+v, want unverifiable held at the alt", got)
+	}
+
+	// Untagged files against a named best stay undecided: they could be it.
+	named := seadex.Entry{AniListID: 1, Torrents: []seadex.Torrent{pack(1, 12, 1), alt}}
+	got = extendedOne(t, heldSeries(release.NoGroup), named)
+	if len(got) != 1 || got[0].Status != StatusUnverifiable || got[0].Tier == TierAlt {
+		t.Fatalf("untagged files: %+v, want undecided", got)
+	}
+
+	m := match.Match{Item: heldSeries("dekinai"), Arr: library.ArrSonarr, Entry: entry, Record: mapping.Record{SeasonTvdb: 1}}
+	if got := New(Config{}).Compare([]match.Match{m}); len(got) != 1 || got[0].Tier == TierAlt {
+		t.Errorf("without Extended: %+v, want upstream's undecided row", got)
 	}
 }
