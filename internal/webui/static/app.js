@@ -380,7 +380,6 @@ function renderOverview(snap) {
   const optional = rows.filter(isOptional).length;
   $("kpi-upgrades").textContent = ready ? upgradesShown : "–";
   $("kpi-upgrades-sub").textContent = optional && !showOptional ? `${optional} more optional (you have an alt)` : "better releases and newer versions";
-  setTone($("kpi-upgrades"), upgradesShown ? "warn" : ready ? "good" : "");
   for (const [id, kind] of [["kpi-missing", "missing"], ["kpi-groups", "groups"], ["kpi-nobest", "nobest"]]) {
     $(id).textContent = ready ? rows.filter((f) => kindOf(f) === kind).length : "–";
   }
