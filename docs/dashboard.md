@@ -23,7 +23,7 @@ Its state goes in `webui-state.json` beside `config.yaml`, saved every minute an
   - A filter bar for both tables:
     - title or group, Sonarr or Radarr, and what to show;
     - **Show optional upgrades**, which adds the upgrades where you already have a SeaDex alt;
-    - **Show unmonitored**, off by default, which adds series, seasons and movies set to unmonitored in Sonarr or Radarr.
+    - **Show unmonitored (incl. Specials)**, off by default, which adds series, seasons and movies set to unmonitored in Sonarr or Radarr. That includes Specials (season 0), which Sonarr leaves unmonitored on most shows, so films and specials filed there stay hidden until it is ticked. **Scout health → Hidden as unmonitored** lists every hidden row and the flag that hides it.
 
     The dashboard reads the monitored flags straight from the Sonarr and Radarr APIs (`/api/v3/series` and `/api/v3/movie`, or `/api/v5` on Sonarr 5) every 15 minutes, so a change there shows without waiting for a SeaDex check. A row counts as monitored until its flags have been read.
   - **Upgrades available** lists everything with something to do. The **Why** column says what:
