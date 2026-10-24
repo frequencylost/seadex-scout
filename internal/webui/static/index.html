@@ -37,8 +37,10 @@
     <div id="attention" class="attention" hidden></div>
 
     <div class="kpis">
-      <div class="kpi"><span class="kpi-label">Upgrades</span><span id="kpi-upgrades" class="kpi-value">–</span><span id="kpi-upgrades-sub" class="kpi-sub"></span></div>
-      <div class="kpi"><span class="kpi-label">Not downloaded</span><span id="kpi-missing" class="kpi-value">–</span><span class="kpi-sub">SeaDex entries with no file yet</span></div>
+      <div class="kpi clickable" data-why="upgrade" title="Show only upgrades"><span class="kpi-label">Upgrades</span><span id="kpi-upgrades" class="kpi-value">–</span><span id="kpi-upgrades-sub" class="kpi-sub"></span></div>
+      <div class="kpi clickable" data-why="missing" title="Show only entries not downloaded"><span class="kpi-label">Not downloaded</span><span id="kpi-missing" class="kpi-value">–</span><span class="kpi-sub">SeaDex entries with no file yet</span></div>
+      <div class="kpi clickable" data-why="groups" title="Show only entries whose release group needs a look"><span class="kpi-label">Groups to check</span><span id="kpi-groups" class="kpi-value">–</span><span class="kpi-sub">several groups, or one that can't be read</span></div>
+      <div class="kpi clickable" data-why="nobest" title="Show only entries SeaDex names no best for"><span class="kpi-label">No SeaDex best</span><span id="kpi-nobest" class="kpi-value">–</span><span class="kpi-sub">theoretical, incomplete or filtered out</span></div>
       <div class="kpi"><span class="kpi-label">Anime at SeaDex best or alt</span><span id="kpi-bestalt" class="kpi-value">–</span><span id="kpi-bestalt-sub" class="kpi-sub"></span></div>
       <div class="kpi"><span class="kpi-label">Last check</span><span id="kpi-lastcheck" class="kpi-value">–</span><span id="kpi-lastcheck-sub" class="kpi-sub"></span></div>
     </div>

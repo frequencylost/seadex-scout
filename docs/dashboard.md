@@ -18,7 +18,7 @@ Its state goes in `webui-state.json` beside `config.yaml`, saved every minute an
 
 - **Overview**:
   - Attention tiles, shown only while something needs a look. They use the same conditions as the Grafana tiles and Loki alerts.
-  - The number of upgrades, findings to check by hand, the share of your anime at SeaDex's best or an alt, and when the last check ran.
+  - Count tiles for **Upgrades**, **Not downloaded**, **Groups to check** (several release groups, or a group that can't be read) and **No SeaDex best**. Clicking one filters the table to that kind, and clicking it again shows everything. Then the share of your anime at SeaDex's best or an alt, and when the last check ran.
   - The **Library overview** bars from the daily full check.
   - A filter bar for both tables:
     - title or group, Sonarr or Radarr, and what to show;

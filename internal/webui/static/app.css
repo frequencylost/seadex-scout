@@ -219,6 +219,9 @@ input[type="search"] { width: 240px; max-width: 100%; }
   padding: 14px 16px;
   box-shadow: var(--shadow);
 }
+.kpi.clickable { cursor: pointer; }
+.kpi.clickable:hover { border-color: var(--divider); }
+.kpi.selected { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent) inset; }
 .kpi-label { color: var(--muted); font-size: 12.5px; font-weight: 500; }
 .kpi-value { font-size: 30px; font-weight: 700; font-variant-numeric: tabular-nums; line-height: 1.2; }
 .kpi-value.small-value { font-size: 20px; }

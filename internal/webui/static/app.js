@@ -321,6 +321,12 @@ function unmonitoredTest(snap) {
   };
 }
 
+// setTone colours a stat tile by the value inside it, keeping its other classes.
+function setTone(valueNode, tone) {
+  const tile = valueNode.parentElement;
+  for (const t of ["good", "warn", "bad"]) tile.classList.toggle(t, t === tone);
+}
+
 // The row kinds of the two finding tables, by status.
 const UPGRADE = new Set(["better_release", "newer_revision"]);
 const GROUPS = new Set(["mixed_group_manual", "unverifiable"]);
@@ -374,8 +380,13 @@ function renderOverview(snap) {
   const optional = rows.filter(isOptional).length;
   $("kpi-upgrades").textContent = ready ? upgradesShown : "–";
   $("kpi-upgrades-sub").textContent = optional && !showOptional ? `${optional} more optional (you have an alt)` : "better releases and newer versions";
-  $("kpi-upgrades").parentElement.className = "kpi" + (upgradesShown ? " warn" : ready ? " good" : "");
-  $("kpi-missing").textContent = ready ? rows.filter((f) => kindOf(f) === "missing").length : "–";
+  setTone($("kpi-upgrades"), upgradesShown ? "warn" : ready ? "good" : "");
+  for (const [id, kind] of [["kpi-missing", "missing"], ["kpi-groups", "groups"], ["kpi-nobest", "nobest"]]) {
+    $(id).textContent = ready ? rows.filter((f) => kindOf(f) === kind).length : "–";
+  }
+  for (const tile of document.querySelectorAll(".kpi[data-why]")) {
+    tile.classList.toggle("selected", tile.dataset.why === $("upgrades-why").value);
+  }
 
   const lib = snap.library && snap.library.attrs;
   if (lib && num(lib.anime_items)) {
@@ -392,7 +403,7 @@ function renderOverview(snap) {
   $("kpi-lastcheck-sub").textContent = lc
     ? (lc.msg.includes("degraded") ? `${lc.msg} (${lc.attrs.reason || "?"})` : lc.msg.startsWith("cycle") ? "full check" : "quick check")
     : "running…";
-  $("kpi-lastcheck").parentElement.className = "kpi" + (lc && lc.msg.includes("degraded") ? " warn" : "");
+  setTone($("kpi-lastcheck"), lc && lc.msg.includes("degraded") ? "warn" : "");
 
   renderLibrary(snap, now);
   renderRefresh(snap.refresh || {}, now);
@@ -1133,6 +1144,15 @@ function init() {
   $("qbit-test").addEventListener("click", testQbit);
   $("usenet-test").addEventListener("click", testUsenet);
   $("refresh-library").addEventListener("click", refreshLibrary);
+  // A count tile filters the table to its kind; clicking it again shows everything.
+  for (const tile of document.querySelectorAll(".kpi[data-why]")) {
+    tile.addEventListener("click", () => {
+      const sel = $("upgrades-why");
+      sel.value = sel.value === tile.dataset.why ? "" : tile.dataset.why;
+      if (state.snap) renderOverview(state.snap);
+      if (sel.value) $("upgrades").scrollIntoView({ behavior: "smooth", block: "start" });
+    });
+  }
   $("usenet-close").addEventListener("click", () => $("usenet-dialog").close());
   $("report-search").addEventListener("input", renderReport);
   $("report-verdict").addEventListener("input", renderReport);
