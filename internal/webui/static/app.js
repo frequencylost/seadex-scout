@@ -317,7 +317,11 @@ function unmonitoredTest(snap) {
     const a = f.attrs;
     if (!a.arr_id || !keys.size) return false;
     const base = `${a.arr}:${a.arr_id}`;
-    return keys.has(base) || (a.arr === "sonarr" && a.season !== undefined && keys.has(`${base}:${a.season}`));
+    // A season's own flag counts only for a row that is that season, or
+    // episodes of it. A whole-series row carries season 0, which would
+    // otherwise read the Specials flag, unmonitored on most shows.
+    const seasonRow = a.scope === "season" || a.scope === "episodes";
+    return keys.has(base) || (a.arr === "sonarr" && seasonRow && a.season !== undefined && keys.has(`${base}:${a.season}`));
   };
 }
 

@@ -58,7 +58,11 @@ func TestDemo(t *testing.T) {
 		{"Spirited Away", "radarr", "Tsundere-Raws", "alt", "Arid", "better_release", 0, 14 << 30, 3 << 30},
 	}
 	for i, s := range shows {
-		kvs := []any{"title", s.title, "al_id", 1000 + i, "arr", s.arr, "arr_id", 10 + i, "arr_url", "https://example.com/" + s.arr,
+		scope := "season"
+		if s.arr == "radarr" {
+			scope = "movie"
+		}
+		kvs := []any{"title", s.title, "al_id", 1000 + i, "arr", s.arr, "arr_id", 10 + i, "scope", scope, "arr_url", "https://example.com/" + s.arr,
 			"season", s.season, "status", s.status, "current_group", s.cur, "current_tier", s.tier,
 			"recommended_group", s.best, "alt_groups", "", "nyaa_url", fmt.Sprintf("https://nyaa.si/view/%d", 1700000+i),
 			"seadex_tags", "best · 1080p · dual-audio", "pass_id", pass,

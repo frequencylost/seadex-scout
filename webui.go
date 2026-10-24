@@ -129,11 +129,19 @@ func (w *webUIRuntime) start(ctx context.Context, cfg *config.Config) func() {
 	if cfg.RadarrEnabled() {
 		radarr = webui.Arr{URL: cfg.RadarrURL, APIKey: cfg.RadarrAPIKey}
 	}
+	poller := webui.NewMonitoredPoller(sonarr, radarr, w.store, log)
 	polled := make(chan struct{})
 	go func() {
 		defer close(polled)
-		webui.NewMonitoredPoller(sonarr, radarr, w.store, log).Run(ctx)
+		poller.Run(ctx)
 	}()
+	// Refresh local library re-reads the monitored flags first, so one click
+	// picks up both a change of monitoring and newly imported files. The flags
+	// are read even when the library refresh itself cannot run.
+	refreshAll := func(ctx context.Context) error {
+		poller.Refresh(ctx)
+		return w.runRefresh(ctx)
+	}
 
 	notifier := startNtfy(ctx, w.store, log)
 
@@ -147,7 +155,7 @@ func (w *webUIRuntime) start(ctx context.Context, cfg *config.Config) func() {
 		Notifier:  notifier,
 		Qbit:      newQbit(log),
 		Usenet:    newUsenet(log),
-		Refresher: webui.NewLibraryRefresher(ctx, w.runRefresh, w.store),
+		Refresher: webui.NewLibraryRefresher(ctx, refreshAll, w.store),
 		Log:       log,
 	})
 

@@ -74,7 +74,7 @@ func drain(ctx context.Context, n *Notifier, events <-chan Event) {
 func logUpgrade(log *slog.Logger, pass int64, title string, afterStart bool, extra ...any) {
 	log.Info("upgrade found", "pass_id", pass, "after_start", afterStart, "title", title, "al_id", 7,
 		"arr", "sonarr", "season", 1, "recommended_group", "Okay-Subs")
-	kvs := append([]any{"title", title, "al_id", 7, "arr", "sonarr", "arr_id", 3, "season", 1,
+	kvs := append([]any{"title", title, "al_id", 7, "arr", "sonarr", "arr_id", 3, "season", 1, "scope", "season",
 		"status", "better_release", "current_group", "SubsPlease", "current_tier", "unlisted",
 		"recommended_group", "Okay-Subs", "nyaa_url", "https://nyaa.si/view/1", "arr_url", "http://sonarr/series/x",
 		"recommended_bytes", int64(38 << 30), "size_change_bytes", int64(21 << 30),
@@ -200,5 +200,33 @@ func TestNtfyRejectsBadURLs(t *testing.T) {
 	n, err := NewNotifier(NtfyConfig{TopicURL: "https://ntfy.example.com/base/alerts"}, NewStore(""), slog.New(slog.DiscardHandler))
 	if err != nil || n.server != "https://ntfy.example.com/base" || n.topic != "alerts" {
 		t.Errorf("server %q topic %q err %v", n.server, n.topic, err)
+	}
+}
+
+// TestUnmonitoredWholeSeriesIgnoresSpecials pins the season check: a
+// whole-series row carries season 0, and Sonarr's Specials being unmonitored
+// must not hide a monitored show.
+func TestUnmonitoredWholeSeriesIgnoresSpecials(t *testing.T) {
+	store := NewStore("")
+	store.setMonitored([]string{"sonarr:3:0", "sonarr:4:2", "sonarr:5"}, "")
+	test := store.unmonitoredTest()
+	line := func(id int64, scope string, season int64) *Line {
+		return &Line{Attrs: map[string]any{"arr": "sonarr", "arr_id": id, "scope": scope, "season": season}}
+	}
+	for _, c := range []struct {
+		l    *Line
+		want bool
+		name string
+	}{
+		{line(3, "series", 0), false, "whole series, Specials unmonitored"},
+		{line(3, "episodes", 0), true, "specials row, Specials unmonitored"},
+		{line(4, "season", 2), true, "unmonitored season"},
+		{line(4, "season", 1), false, "monitored season"},
+		{line(4, "series", 0), false, "whole series, one season unmonitored"},
+		{line(5, "series", 0), true, "unmonitored series"},
+	} {
+		if got := test(c.l); got != c.want {
+			t.Errorf("%s: unmonitored = %v, want %v", c.name, got, c.want)
+		}
 	}
 }

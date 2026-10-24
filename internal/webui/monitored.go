@@ -51,7 +51,7 @@ func (p *MonitoredPoller) Run(ctx context.Context) {
 	t := time.NewTicker(monitoredEvery)
 	defer t.Stop()
 	for {
-		p.refresh(ctx)
+		p.Refresh(ctx)
 		select {
 		case <-ctx.Done():
 			return
@@ -69,7 +69,13 @@ type Monitored struct {
 	Error       string    `json:"error,omitempty"`
 }
 
-func (p *MonitoredPoller) refresh(ctx context.Context) {
+// Refresh reads the monitored flags now: on the poller's own schedule, and
+// when the dashboard's Refresh local library button asks. A failed read keeps
+// the last flags. It does nothing when neither Sonarr nor Radarr is set up.
+func (p *MonitoredPoller) Refresh(ctx context.Context) {
+	if p.sonarr.URL == "" && p.radarr.URL == "" {
+		return
+	}
 	var keys []string
 	var errs []string
 	if p.sonarr.URL != "" {

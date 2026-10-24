@@ -68,6 +68,7 @@ These are environment variables rather than `config.yaml` keys. Upstream rejects
 The scout reads your whole Sonarr and Radarr library only during the daily full check, so a release you download and import can stay listed for up to a day. **↻ Refresh local library**, at the right of the filter bar, shortens that:
 
 - It re-reads Sonarr and Radarr straight away, and compares them against the SeaDex catalogue the last full check downloaded, which the scout now keeps in memory.
+- It also re-reads which series, seasons and movies are monitored first, so **Show unmonitored** reflects a change at once instead of within the usual 15 minutes. That part runs even when the library refresh can't, such as while a check is running.
 - **Nothing is fetched from SeaDex.** The only traffic is to your own Sonarr and Radarr. Brand-new series can still mean an AniList lookup or an anime ID map update, as in any check.
 - Upgrades you've since imported move to **Already on a SeaDex pick** or drop off.
 - It takes about as long as reading your library does. The status beside the button shows its progress, and the tables update when it ends.

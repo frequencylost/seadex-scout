@@ -33,7 +33,7 @@ func TestMonitoredPollerReadsUnmonitored(t *testing.T) {
 
 	store := NewStore("")
 	p := NewMonitoredPoller(Arr{URL: sonarr.URL + "/base/", APIKey: "k1"}, Arr{URL: radarr.URL, APIKey: "k2"}, store, slog.New(slog.DiscardHandler))
-	p.refresh(context.Background())
+	p.Refresh(context.Background())
 
 	m := store.Snapshot().Monitored
 	slices.Sort(m.Unmonitored)
@@ -46,7 +46,7 @@ func TestMonitoredPollerReadsUnmonitored(t *testing.T) {
 
 	// A failed read keeps the last flags and reports the error.
 	sonarr.Close()
-	p.refresh(context.Background())
+	p.Refresh(context.Background())
 	m = store.Snapshot().Monitored
 	if len(m.Unmonitored) != 3 || m.Error == "" {
 		t.Fatalf("after a failed read: %+v, want the last flags and an error", m)

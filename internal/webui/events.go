@@ -139,7 +139,16 @@ func (st *Store) unmonitoredTest() func(*Line) bool {
 			return false
 		}
 		base := l.Str("arr") + ":" + strconv.FormatInt(id, 10)
-		return keys[base] || (l.Str("arr") == "sonarr" && l.Attrs["season"] != nil && keys[base+":"+strconv.FormatInt(l.Int("season"), 10)])
+		if keys[base] {
+			return true
+		}
+		// A season's own flag counts only for a row that is that season, or
+		// episodes of it: a whole-series row carries season 0, which would
+		// read the Specials flag, unmonitored on most shows.
+		scope := l.Str("scope")
+		seasonRow := scope == "season" || scope == "episodes"
+		return l.Str("arr") == "sonarr" && seasonRow && l.Attrs["season"] != nil &&
+			keys[base+":"+strconv.FormatInt(l.Int("season"), 10)]
 	}
 }
 
