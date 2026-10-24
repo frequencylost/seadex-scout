@@ -150,6 +150,14 @@ type Store struct {
 	notify NotifyStatus
 
 	refresh RefreshJob // the dashboard's local library refresh (refresh.go)
+	version string     // the build, for the footer
+}
+
+// SetVersion names the running build for the dashboard's footer.
+func (st *Store) SetVersion(v string) {
+	st.mu.Lock()
+	st.version = v
+	st.mu.Unlock()
 }
 
 // NewStore returns an empty Store that persists to path ("" keeps it in memory).
@@ -410,6 +418,7 @@ type Snapshot struct {
 	Qbit      QbitStatus   `json:"qbit"`
 	Usenet    UsenetStatus `json:"usenet"`
 	Refresh   RefreshJob   `json:"refresh"`
+	Version   string       `json:"version,omitempty"`
 	state
 }
 
@@ -431,7 +440,7 @@ func (st *Store) Snapshot() Snapshot {
 	m := st.monitored
 	m.Unmonitored = slices.Clone(m.Unmonitored)
 	n := st.notify
-	return Snapshot{Now: st.now(), StartedAt: st.started, Config: st.config, ReportJob: st.job, Monitored: m, Notify: n, Refresh: st.refresh, state: s}
+	return Snapshot{Now: st.now(), StartedAt: st.started, Config: st.config, ReportJob: st.job, Monitored: m, Notify: n, Refresh: st.refresh, Version: st.version, state: s}
 }
 
 // Logs returns the recent log lines, newest last.

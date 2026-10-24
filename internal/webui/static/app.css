@@ -330,8 +330,11 @@ table.data tr.sub-row:hover, table.data tr.has-subs:hover { background: none; }
 .pos, td .sub.pos { color: var(--bad); }
 .neg, td .sub.neg { color: var(--good); }
 
-.bars { display: flex; flex-direction: column; gap: 6px; }
-.bar-row { display: grid; grid-template-columns: 210px 1fr 70px; align-items: center; gap: 10px; font-size: 13px; }
+/* The label column fits the longest label, shared by every row, so the bars
+   start right after the text and still line up. */
+.bars { display: grid; grid-template-columns: max-content 1fr auto; align-items: center; gap: 6px 12px; font-size: 13px; }
+.bar-row { display: contents; }
+.bars > p { grid-column: 1 / -1; }
 .bar-track { height: 16px; background: var(--surface-2); border-radius: 4px; overflow: hidden; }
 .bar-fill { height: 100%; border-radius: 4px; min-width: 2px; }
 .bar-row .num { text-align: right; font-variant-numeric: tabular-nums; }
@@ -371,7 +374,7 @@ table.data tr.sub-row:hover, table.data tr.has-subs:hover { background: none; }
 
 @media (max-width: 720px) {
   .topbar, .tabs, main { padding-left: 16px; padding-right: 16px; }
-  .bar-row { grid-template-columns: 120px 1fr 52px; }
+  .bars .label { max-width: 130px; }
   input[type="search"] { width: 100%; }
   .kpi-value { font-size: 24px; }
 }

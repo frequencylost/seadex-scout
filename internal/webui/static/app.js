@@ -290,7 +290,8 @@ function render() {
   const schedule = interval === -1 ? "SeaDex checks are started from outside the container"
     : interval ? `SeaDex checked every ${fmtSpan(interval)}${lastSeaDex}, full check daily`
     : "SeaDex checked on the scout's schedule";
-  $("footer-text").textContent = `Page refreshed ${fmtTime(snap.now)} from this container every ${REFRESH_MS / 1000}s (never contacts SeaDex) · ${schedule}`;
+  $("footer-text").textContent = `Page refreshed ${fmtTime(snap.now)} from this container every ${REFRESH_MS / 1000}s (never contacts SeaDex) · ${schedule}` +
+    (snap.version ? ` · build ${snap.version}` : "");
 
   const box = $("attention");
   box.hidden = items.length === 0;
@@ -312,16 +313,27 @@ function render() {
 // unmonitored in Sonarr or Radarr. Rows read before the scout logged arr ids,
 // or before the flags were read, count as monitored.
 function unmonitoredTest(snap) {
+  const reason = unmonitoredReason(snap);
+  return (f) => reason(f) !== "";
+}
+
+// unmonitoredReason says which flag makes a row unmonitored, or "" when none
+// does: the Scout health tab lists them, so a wrong one can be seen.
+function unmonitoredReason(snap) {
   const keys = new Set((snap.monitored && snap.monitored.unmonitored) || []);
   return (f) => {
     const a = f.attrs;
-    if (!a.arr_id || !keys.size) return false;
+    if (!a.arr_id || !keys.size) return "";
     const base = `${a.arr}:${a.arr_id}`;
+    if (keys.has(base)) return a.arr === "radarr" ? "movie unmonitored in Radarr" : "series unmonitored in Sonarr";
     // A season's own flag counts only for a row that is that season, or
     // episodes of it. A whole-series row carries season 0, which would
     // otherwise read the Specials flag, unmonitored on most shows.
     const seasonRow = a.scope === "season" || a.scope === "episodes";
-    return keys.has(base) || (a.arr === "sonarr" && seasonRow && a.season !== undefined && keys.has(`${base}:${a.season}`));
+    if (a.arr === "sonarr" && seasonRow && a.season !== undefined && keys.has(`${base}:${a.season}`)) {
+      return Number(a.season) === 0 ? "Specials unmonitored in Sonarr" : `season ${a.season} unmonitored in Sonarr`;
+    }
+    return "";
   };
 }
 
@@ -676,6 +688,30 @@ function linkCell(a, links, nyaaURL) {
   return td;
 }
 
+// ---------- hidden as unmonitored ----------
+
+function renderHidden(snap, now) {
+  const m = snap.monitored || {};
+  const reason = unmonitoredReason(snap);
+  const hidden = (snap.findings || []).map((f) => [f, reason(f)]).filter(([, r]) => r);
+  const counts = { series: 0, seasons: 0, movies: 0 };
+  for (const k of m.unmonitored || []) {
+    if (k.startsWith("radarr:")) counts.movies++;
+    else if (k.split(":").length === 3) counts.seasons++;
+    else counts.series++;
+  }
+  $("hidden-status").textContent = !m.at
+    ? (m.error ? `Not read yet: ${m.error}` : "Not read yet.")
+    : `Read from Sonarr and Radarr ${ago(m.at, now)}: ${counts.series} series, ${counts.seasons} seasons and ${counts.movies} movies are unmonitored.` +
+      (m.error ? ` The last read failed, so these are from before: ${m.error}` : "");
+  $("hidden-count").textContent = hidden.length;
+  setRows($("hidden-rows").tBodies[0], hidden.map(([f, r]) => el("tr", {},
+    el("td", {}, link(f.attrs.arr_url, f.attrs.title || "?")),
+    el("td", { text: `${arrName(f.attrs.arr)} · ${seasonLabel(f.attrs)}` }),
+    el("td", { text: f.attrs.scope || "–" }),
+    el("td", { text: r }))), 4, "No rows are hidden as unmonitored.");
+}
+
 // ---------- local library refresh ----------
 
 let refreshPoll = null;
@@ -937,6 +973,7 @@ function renderHealth(snap) {
   renderNotify(snap.notify || {}, now);
   renderQbit(snap.qbit || {});
   renderUsenet(snap.usenet || {});
+  renderHidden(snap, now);
 
   setRows($("errors").tBodies[0], (snap.errors || []).slice().reverse().map((e) => {
     const detail = Object.entries(e.attrs || {}).map(([k, v]) => `${k}=${typeof v === "string" ? v : JSON.stringify(v)}`).join("  ");

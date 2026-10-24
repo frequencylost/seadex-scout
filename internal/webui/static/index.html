@@ -128,6 +128,18 @@
     </div>
 
     <div class="card">
+      <div class="card-head"><h2>Hidden as unmonitored <span id="hidden-count" class="count"></span></h2></div>
+      <p id="hidden-status" class="muted small"></p>
+      <p class="muted small">These rows are hidden while Show unmonitored is off. The reason says which Sonarr or Radarr flag hides each one.</p>
+      <div class="table-wrap">
+        <table id="hidden-rows" class="data">
+          <thead><tr><th>Title</th><th>Season</th><th>Compared as</th><th>Hidden because</th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="card">
       <div class="card-head">
         <h2>Notifications</h2>
         <div class="controls">

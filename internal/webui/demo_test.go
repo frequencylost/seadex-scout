@@ -143,7 +143,8 @@ func TestDemo(t *testing.T) {
 		t.Fatal(err)
 	}
 	// Vinland Saga's season 2 and Your Name. are unmonitored.
-	store.setMonitored([]string{"sonarr:11:2", "radarr:13"}, "")
+	store.setMonitored([]string{"sonarr:11:2", "radarr:13", "sonarr:10:0"}, "")
+	store.SetVersion("dmanagers@5429752")
 	// A stand-in qBittorrent that accepts everything.
 	fakeQbit := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		_, _ = w.Write([]byte("Ok."))

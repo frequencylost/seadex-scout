@@ -13,9 +13,11 @@ COPY config.example.yaml ./
 COPY internal/ internal/
 # Cross-compiled on the build host, so a multi-arch build needs no emulation.
 ARG TARGETOS TARGETARCH
+# The build's name, shown in the dashboard's footer; the workflow sets it.
+ARG VERSION=dev
 RUN --mount=type=cache,target=/go/pkg/mod \
     --mount=type=cache,target=/root/.cache/go-build \
-    CGO_ENABLED=0 GOOS=$TARGETOS GOARCH=$TARGETARCH go build -trimpath -ldflags="-s -w" -o /seadex-scout .
+    CGO_ENABLED=0 GOOS=$TARGETOS GOARCH=$TARGETARCH go build -trimpath -ldflags="-s -w -X main.buildVersion=$VERSION" -o /seadex-scout .
 COPY LICENSE NOTICE THIRD_PARTY_NOTICES.md ./
 COPY scripts/collect-licenses.sh scripts/
 RUN --mount=type=cache,target=/go/pkg/mod \

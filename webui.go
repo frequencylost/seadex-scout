@@ -59,6 +59,10 @@ const (
 	webUIStopTimeout = 5 * time.Second
 )
 
+// buildVersion names the build, such as "main@<commit>"; the image build
+// sets it with -ldflags -X, and a local build leaves "dev".
+var buildVersion = "dev"
+
 // activeWebUI is set by main in daemon mode when the dashboard is on; run
 // starts it. Every other mode leaves it nil.
 var activeWebUI *webUIRuntime
@@ -103,6 +107,7 @@ func installWebUI(configPath string) *webUIRuntime {
 	addr := net.JoinHostPort(strings.TrimSpace(os.Getenv(envWebUIBind)), port)
 
 	store := webui.NewStore(filepath.Join(filepath.Dir(configPath), webUIStateFile))
+	store.SetVersion(shortVersion(buildVersion))
 	loadErr := store.Load()
 	slog.SetDefault(slog.New(webui.NewHandler(slog.Default().Handler(), store)))
 	if loadErr != nil {
@@ -332,4 +337,12 @@ func localRefresh(ex *scheduler.Exclusive, sc *scout.Scout, marker *health.Marke
 		}
 		return refreshErr
 	}
+}
+
+// shortVersion trims the commit in "branch@<40-hex commit>" to 7 characters.
+func shortVersion(v string) string {
+	if i := strings.LastIndex(v, "@"); i >= 0 && len(v)-(i+1) > 7 {
+		return v[:i+1+7]
+	}
+	return v
 }
