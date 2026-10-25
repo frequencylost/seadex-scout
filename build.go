@@ -163,7 +163,10 @@ func buildScout(ctx context.Context, cfg *config.Config, server *indexer.Indexer
 			Extended: true,
 		}),
 		Notifier: notify.NewNotifier(c.log, cfg.IgnoreFindings),
-		Auditor:  audit.New(auditConfig(cfg)),
+		// The fork keeps each downloaded catalogue beside state.json.
+		CatalogueDir:    config.DefaultCycleLockDir,
+		CatalogueMaxAge: catalogueMaxAge(c.log),
+		Auditor:         audit.New(auditConfig(cfg)),
 		AniListStats: func() scout.AniListStats {
 			st := anilistClient.Stats()
 			return scout.AniListStats{Calls: st.Calls, RateLimitWaits: st.RateLimitWaits}

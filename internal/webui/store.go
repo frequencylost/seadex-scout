@@ -123,7 +123,10 @@ type state struct {
 	Events   []Line               `json:"events,omitempty"`
 
 	Indexer Indexer `json:"indexer"`
-	Reports []Line  `json:"reports,omitempty"`
+	// Catalogue is the latest "seadex catalogue in use" line: which SeaDex
+	// data the comparison used, live or the saved copy, and how old it is.
+	Catalogue *Line  `json:"catalogue,omitempty"`
+	Reports   []Line `json:"reports,omitempty"`
 }
 
 // Store holds the dashboard's view of the scout, built from the log lines the
@@ -359,6 +362,8 @@ func (st *Store) Observe(l Line) {
 			st.s.Indexer.ByScope[scope]++
 		}
 		st.s.Indexer.LastRequest = l.Time
+	case "seadex catalogue in use":
+		st.s.Catalogue = &l
 	case "indexer feed snapshot written":
 		st.s.Indexer.LastSnapshot = &l
 	case "report written":

@@ -229,6 +229,14 @@ function attentionItems(snap) {
       tab: "health",
     });
   }
+  const cat = catalogueInfo(snap, now);
+  if (cat && cat.source === "saved") {
+    items.push({ cls: "warn", title: `Using saved SeaDex data from ${cat.age}`, tab: "health",
+      text: `SeaDex couldn't be read at the last check, so your library was compared against the copy saved ${cat.date}. It's used for up to ${cat.limit}. New SeaDex picks appear once SeaDex is back.` });
+  } else if (cat && cat.source === "expired") {
+    items.push({ cls: "bad", title: "Saved SeaDex data is too old to use", tab: "health",
+      text: `SeaDex can't be read, and the saved copy from ${cat.date} is past the ${cat.limit} limit. It's kept on disk; set SEADEX_SCOUT_CATALOGUE_MAX_AGE to use it longer.` });
+  }
   const feed = snap.indexer && snap.indexer.last_snapshot;
   if (feed && num(feed.attrs && feed.attrs.ab_releases_skipped) > 0) {
     items.push({ cls: "warn", title: "AnimeBytes feed", text: `${feed.attrs.ab_releases_skipped} AnimeBytes releases held back: indexer.ab_passkey is not set.` });
@@ -261,6 +269,23 @@ function fmtSpan(ms) {
   return `${Math.round(ms / 60e3)} minutes`;
 }
 
+// catalogueInfo describes the SeaDex data the last comparison used, from its
+// "seadex catalogue in use" line, or null before one is logged.
+function catalogueInfo(snap, now) {
+  const l = snap.catalogue;
+  if (!l || !l.attrs || !l.attrs.fetched_at) return null;
+  const fetched = new Date(l.attrs.fetched_at);
+  if (Number.isNaN(fetched.getTime()) || fetched.getFullYear() < 2000) return null;
+  const maxSecs = durationSeconds(l.attrs.max_age);
+  return {
+    source: l.attrs.source,
+    age: ago(fetched, now).replace(" ago", " ago"),
+    date: fetched.toLocaleDateString(undefined, { dateStyle: "medium" }),
+    limit: maxSecs ? fmtSpan(maxSecs * 1000) : "no limit",
+    entries: num(l.attrs.entries),
+  };
+}
+
 function recentErrors(snap) {
   const now = new Date(snap.now).getTime();
   return (snap.errors || []).filter((e) => now - new Date(e.time).getTime() <= 7 * DAY);
@@ -291,6 +316,7 @@ function render() {
     : interval ? `SeaDex checked every ${fmtSpan(interval)}${lastSeaDex}, full check daily`
     : "SeaDex checked on the scout's schedule";
   $("footer-text").textContent = `Page refreshed ${fmtTime(snap.now)} from this container every ${REFRESH_MS / 1000}s (never contacts SeaDex) · ${schedule}` +
+    (catalogueInfo(snap, new Date(snap.now).getTime()) ? ` · SeaDex data from ${catalogueInfo(snap, new Date(snap.now).getTime()).age}` : "") +
     (snap.version ? ` · build ${snap.version}` : "");
 
   const box = $("attention");
@@ -951,6 +977,14 @@ function renderHealth(snap) {
   $("h-errors").textContent = errs.length;
   $("h-errors").parentElement.className = "kpi" + (errs.length ? " warn" : " good");
 
+  const cat = catalogueInfo(snap, now);
+  $("h-catalogue").textContent = cat ? cat.age : "–";
+  $("h-catalogue-sub").textContent = !cat ? "after the first full check"
+    : cat.source === "live" ? `downloaded from SeaDex · ${cat.entries ?? "?"} entries`
+    : cat.source === "local" ? `kept from the last download · ${cat.entries ?? "?"} entries`
+    : cat.source === "saved" ? `saved copy: SeaDex unreachable · used up to ${cat.limit}`
+    : `saved copy too old to use (limit ${cat.limit})`;
+  setTone($("h-catalogue"), cat && cat.source === "saved" ? "warn" : cat && cat.source === "expired" ? "bad" : "");
   const ix = snap.indexer || {};
   $("h-indexer").textContent = (ix.requests || 0).toLocaleString();
   $("h-indexer-sub").textContent = ix.last_request ? `last ${ago(ix.last_request, now)}` : "indexer not used yet";

@@ -346,3 +346,26 @@ func shortVersion(v string) string {
 	}
 	return v
 }
+
+// catalogueMaxAge reads SEADEX_SCOUT_CATALOGUE_MAX_AGE, how old a saved SeaDex
+// catalogue may be and still be used when SeaDex is down: a Go duration such
+// as 720h, or a number of days such as 30d; 0 or off means no limit.
+func catalogueMaxAge(log *slog.Logger) time.Duration {
+	raw := strings.TrimSpace(os.Getenv("SEADEX_SCOUT_CATALOGUE_MAX_AGE"))
+	switch strings.ToLower(raw) {
+	case "":
+		return scout.DefaultCatalogueMaxAge
+	case "0", "off", "none":
+		return 0
+	}
+	if days, ok := strings.CutSuffix(strings.ToLower(raw), "d"); ok {
+		if n, err := strconv.Atoi(days); err == nil && n >= 0 {
+			return time.Duration(n) * 24 * time.Hour
+		}
+	}
+	if d, err := time.ParseDuration(raw); err == nil && d >= 0 {
+		return d
+	}
+	log.Warn("SEADEX_SCOUT_CATALOGUE_MAX_AGE is not a duration such as 30d or 720h; using 30 days", "value", raw)
+	return scout.DefaultCatalogueMaxAge
+}

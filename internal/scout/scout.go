@@ -112,6 +112,11 @@ type Deps struct {
 	// separate two reconciles (see reconcileEvery). Zero or negative means every
 	// iteration reconciles - the conservative reading.
 	PollInterval time.Duration
+	// CatalogueDir is where the fork saves each downloaded SeaDex catalogue
+	// ("" saves none), and CatalogueMaxAge how old a saved copy may be and
+	// still be used, zero for no limit (catalogue.go).
+	CatalogueDir    string
+	CatalogueMaxAge time.Duration
 }
 
 // ReportDeps are the assembled components a Reporter runs the read-only one-shot
@@ -307,6 +312,7 @@ func New(deps *Deps) *Scout {
 		aniListStats: deps.AniListStats,
 		feed:         deps.Feed,
 		pollInterval: deps.PollInterval,
+		local:        localRefresh{dir: deps.CatalogueDir, maxAge: deps.CatalogueMaxAge},
 	}
 }
 
@@ -353,7 +359,7 @@ func (s *Scout) reconcile(ctx context.Context) bool {
 	mapCache, idx, mapErr := s.loadMapping(ctx, &st)
 	entries, seaErr := s.catalogue(ctx)
 	errs := cycleOutcomes{walk: walkErr, mapping: mapErr, seadex: seaErr}
-	if !s.local.running {
+	if !s.local.running && !s.local.fallback {
 		s.warnCatalogueLinkQuality(entries)
 		s.rebuildFeed(ctx, entries, idx, &st, errs)
 	}
@@ -725,6 +731,12 @@ func (s *Scout) logCompletedCycle(snap *library.Snapshot, result *match.Result, 
 		// succeeded, so this is the LEAST severe reason.
 		s.cycleDegraded("tags-emptied-side",
 			append([]any{"emptied_arrs", strings.Join(snap.FilteredEmptyArrs, ",")}, attrs...)...)
+	case s.local.fallback:
+		// This fork's fallback: SeaDex could not be read, so the pass compared
+		// against the saved catalogue (catalogue.go) and may miss SeaDex's
+		// latest changes.
+		s.cycleDegraded("seadex-saved-catalogue",
+			append([]any{"catalogue_fetched_at", s.local.fetchedAt}, attrs...)...)
 	default:
 		s.log.Info("cycle complete", attrs...)
 	}
@@ -867,7 +879,9 @@ func (s *Scout) handlePreCompareGate(ctx context.Context, st *state.State, snap 
 	// observed SeaDex outage exists in persisted state.
 	if !s.local.running {
 		// A local refresh read nothing from SeaDex, so it is evidence of neither.
-		s.recordSeaDexFetch(ctx, st, errs.seadex)
+		// A check comparing against the saved catalogue still failed to read
+		// SeaDex, and records that as the outage it is.
+		s.recordSeaDexFetch(ctx, st, cmpOr(errs.seadex, s.local.fallbackErr))
 	}
 	if walkHandled, walkHealthy := s.handleLibraryGate(ctx, st, mapCache, errs); walkHandled {
 		return true, walkHealthy, nil

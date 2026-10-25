@@ -78,6 +78,18 @@ The scout reads your whole Sonarr and Radarr library only during the daily full 
 - The daily full check still runs on its own schedule. It is what picks up new SeaDex entries and changes.
 - It logs `local library refresh started` and `local library refresh complete`, not `reconcile started` and `reconcile complete`, so it is not counted as a full check. It does not rebuild the Torznab feed or count as a SeaDex read for outage tracking.
 
+## Saved SeaDex data
+
+Every full check that downloads SeaDex's catalogue also saves it to `/config/seadex-catalogue.json.gz`, a few MB, and moves the previous copy to `seadex-catalogue.prev.json.gz`, so one bad download never leaves the only copy broken. The copy is never deleted, so SeaDex's data outlives a long SeaDex outage.
+
+- **SeaDex down at a full check:** the scout still re-reads Sonarr and Radarr, and compares them against the saved copy, as long as it is younger than `SEADEX_SCOUT_CATALOGUE_MAX_AGE` (default `30d`; `0` means no limit). The check ends as a degraded check with the reason `seadex-saved-catalogue`, and SeaDex's outage is still recorded and notified as before. Anything SeaDex changed meanwhile appears once it is back.
+- **After a restart:** Refresh local library uses the saved copy at once, before the first full check, within the same limit.
+- **Past the limit:** the copy is kept but not used, and checks skip the comparison as the original app does until SeaDex is back. Raise the limit to keep using it.
+- **On the dashboard:**
+  - An Overview tile says when saved data is in use, how old it is and the limit, or that it is too old.
+  - The **SeaDex data** tile on Scout health shows the age and source of the data the last comparison used.
+  - The footer shows its age.
+
 ## Notifications
 
 The container can send notifications to [ntfy](https://ntfy.sh) by itself, without Loki or Alertmanager. Set `SEADEX_SCOUT_NTFY_URL` to your topic's full address, such as `https://ntfy.sh/my-seadex-topic` or the address of your own ntfy server, and subscribe to that topic in the ntfy app. On the public server, anyone who knows a topic name can read it, so pick a long, hard-to-guess name or protect it with an access token.

@@ -140,6 +140,8 @@ func TestDemo(t *testing.T) {
 	log.Info("tick complete")
 	log.Error("library walk failed", "arr", "radarr", "error", "radarr returned 503")
 	log.Error("seadex catalogue fetch failing", "condition", "seadex-catalogue-fetch-failing")
+	log.Info("seadex catalogue in use", "source", "saved", "fetched_at", now.Add(-3*24*time.Hour),
+		"entries", 6213, "max_age", (30 * 24 * time.Hour).String())
 	log.Info("indexer request", "scope", "nyaa", "feed", true, "t", "search", "curated", 4, "returned", 12)
 	log.Info("indexer feed snapshot written", "journal_new", 3, "scope", "all", "nyaa_feed", 812, "ab_feed", 0,
 		"ab_releases_skipped", 0)
